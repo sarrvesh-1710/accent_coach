@@ -1,0 +1,9 @@
+# Sarrvesh's CPU DSP dependencies. Python 3.11-3.13 recommended.
+# Install: python -m pip install -r requirements.txt
+numpy==2.2.6
+scipy==1.15.3
+soundfile==0.13.1
+librosa==0.11.0
+praat-parselmouth==0.4.7
+# Lucas and Parthiban add tested torch/transformers/praatio/gradio versions
+# when their modules are integrated. MFA belongs in its own Conda environment.

@@ -216,3 +216,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+# Local speech recordings, generated reports and model downloads
+/data/
+/runs/
+/models/

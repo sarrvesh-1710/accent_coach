@@ -188,14 +188,17 @@ def align_audio(audio, transcript, settings, run_dir) -> dict:
         root = Path(run_dir).resolve()
         root.mkdir(parents=True, exist_ok=True)
         work = Path(tempfile.mkdtemp(prefix="mfa_", dir=root))
-        corpus, output = work / "corpus", work / "aligned"
+        corpus, output = work / "corpus", work / "aligned.TextGrid"
         corpus.mkdir()
         wavfile.write(corpus / "clip.wav", sr, np.rint(x * 32768).astype(np.int16))
         (corpus / "clip.lab").write_text(transcript.strip() + "\n", encoding="utf-8")
         cfg = settings["mfa"]
-        args = [cfg["executable"], "align", str(corpus), cfg["dictionary"], cfg["acoustic_model"],
-                str(output), "--output_format", "long_textgrid", "--single_speaker",
-                "--num_jobs", "1", "--temporary_directory", str(work / "temp")]
+        # align_one avoids the corpus-level export/multiprocessing path, which
+        # can hang on Windows after lattice alignment for a one-file corpus.
+        args = [cfg["executable"], "align_one", str(corpus / "clip.wav"),
+                str(corpus / "clip.lab"), cfg["dictionary"], cfg["acoustic_model"],
+                str(output), "--output_format", "long_textgrid", "--no_use_mp",
+                "--temporary_directory", str(work / "temp")]
         result.update(run_dir=str(work), audio_sha256=fingerprint, duration_sec=len(x) / sr,
                       sample_rate_hz=sr, transcript=transcript, command=args)
         with (work / "mfa.log").open("w", encoding="utf-8") as log:
@@ -203,10 +206,9 @@ def align_audio(audio, transcript, settings, run_dir) -> dict:
                                      timeout=cfg["timeout_sec"], check=False)
         if process.returncode:
             raise RuntimeError(f"MFA exited {process.returncode}; inspect {work / 'mfa.log'}")
-        grids = list(output.rglob("clip.TextGrid"))
-        if len(grids) != 1:
-            raise ValueError("MFA output missing or ambiguous")
-        entries = phone_tier(parse_textgrid(grids[0]), cfg["phone_tiers"])
+        if not output.is_file() or output.stat().st_size == 0:
+            raise ValueError("MFA output missing or empty")
+        entries = phone_tier(parse_textgrid(output), cfg["phone_tiers"])
         segments = []
         for index, (start, end, label) in enumerate(entries):
             canonical, stress = split_phone(label)
@@ -215,7 +217,7 @@ def align_audio(audio, transcript, settings, run_dir) -> dict:
         validate_segments(segments, len(x) / sr)
         if not any(s["canonical_phone"].lower() not in ("", "sil", "sp", "spn", "<eps>") for s in segments):
             raise ValueError("No usable speech phones in alignment")
-        result.update(status="available", segments=segments, textgrid_path=str(grids[0]))
+        result.update(status="available", segments=segments, textgrid_path=str(output))
     except Exception as exc:
         result.update(status="unavailable", segments=[], reason=f"{type(exc).__name__}: {exc}")
     return result

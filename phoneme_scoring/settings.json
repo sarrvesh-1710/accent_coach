@@ -14,7 +14,7 @@
     "dictionary": "english_us_arpa",
     "acoustic_model": "english_us_arpa",
     "phone_tiers": ["phones"],
-    "timeout_sec": 300
+    "timeout_sec": 900
   },
   "dsp": {
     "min_duration_sec": 0.1,

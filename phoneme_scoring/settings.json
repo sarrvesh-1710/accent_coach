@@ -1,0 +1,63 @@
+{
+  "sample_rate_hz": 16000,
+  "max_duration_sec": 5,
+  "device": "cpu",
+  "model": {
+    "id": "facebook/wav2vec2-xlsr-53-espeak-cv-ft",
+    "revision": "main",
+    "cache_dir": null,
+    "local_files_only": false,
+    "cpu_threads": 2
+  },
+  "mfa": {
+    "executable": "mfa",
+    "dictionary": "english_us_arpa",
+    "acoustic_model": "english_us_arpa",
+    "phone_tiers": ["phones"],
+    "timeout_sec": 300
+  },
+  "dsp": {
+    "min_duration_sec": 0.1,
+    "min_rms": 0.0001,
+    "mono": "channel_mean",
+    "resampling": "scipy.signal.resample_poly",
+    "trim": false,
+    "denoise": false,
+    "pitch_shift": false
+  },
+  "scoring": {
+    "map_path": "phoneme_map.json",
+    "min_evidence_frames": 1,
+    "min_evidence_fraction": 0.05,
+    "min_top_phone_probability": 0.1,
+    "min_phonetic_mass": 0.15,
+    "min_winner_margin_nats": 0.2,
+    "notes": "These are provisional evidence-quality gates, NOT correct/incorrect thresholds. Full non-special multilingual vocabulary is the competitor inventory. CTC spikes are sparse, so one retained frame is allowed but reported. No calibration or training."
+  },
+  "prompts": [],
+  "prompt_note": "Paste the three exact app prompt texts here; they were not supplied. The complete standard ARPA map includes requested target contrasts.",
+  "l2_arctic_root": "./L2-ARCTIC",
+  "l2_arctic": {
+    "official_access_url": "https://psi.engr.tamu.edu/l2-arctic-corpus/",
+    "license": "CC BY-NC 4.0",
+    "license_path": "LICENSE",
+    "attribution": "Zhao, G., Sonsaat, S., Silpachai, A., Lucic, I., Chukharev-Hudilainen, E., Levis, J., and Gutierrez-Osuna, R. (2018). L2-ARCTIC: A Non-native English Speech Corpus. Interspeech, 2783-2787. doi:10.21437/Interspeech.2018-1110",
+    "documentation_url": "https://psi.engr.tamu.edu/l2-arctic-corpus-docs/",
+    "speaker_ids": [],
+    "preferred_min_duration_sec": 2,
+    "evaluation_note": "Exploratory software check only. No detection accuracy or decision threshold. If thresholds are later tuned, reserve separate evaluation speakers. Retain the original corpus LICENSE; do not redistribute corpus audio here.",
+    "annotation_tiers": ["phones"],
+    "minimum_match_iou": 0.3,
+    "ambiguity_iou_gap": 0.1,
+    "output_dir": "./runs/l2_arctic",
+    "selected_samples": [],
+    "record_template": {
+      "speaker_id": "REPLACE_WITH_REAL_SPEAKER",
+      "utterance_id": "REPLACE_WITH_REAL_UTTERANCE",
+      "wav": "SPEAKER/wav/UTTERANCE.wav",
+      "transcript": "SPEAKER/transcript/UTTERANCE.txt",
+      "manual_annotation": "SPEAKER/annotation/UTTERANCE.TextGrid"
+    },
+    "selection_note": "Use --select-l2 --count 30 after official access. Set speaker_ids to two or three speaker IDs, or leave empty for automatic selection of up to three. Prefer 2-5 seconds, report actual counts/coverage and shortfalls. Only annotation/ is manual ground truth, never textgrid/. No corpus or real results bundled."
+  }
+}

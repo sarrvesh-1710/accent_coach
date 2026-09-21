@@ -81,7 +81,21 @@ def _load_model(model_id, revision, cache_dir, local_only, threads):
     torch.set_num_threads(int(threads))
     kwargs = dict(revision=revision, cache_dir=cache_dir, local_files_only=local_only,
                   trust_remote_code=False)
-    processor = Wav2Vec2Processor.from_pretrained(model_id, **kwargs)
+    from transformers import (
+        Wav2Vec2FeatureExtractor,
+        Wav2Vec2PhonemeCTCTokenizer,
+    )
+
+    feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(
+        model_id, **kwargs
+    )
+    tokenizer = Wav2Vec2PhonemeCTCTokenizer.from_pretrained(
+        model_id, do_phonemize=False, **kwargs
+    )
+    processor = Wav2Vec2Processor(
+        feature_extractor=feature_extractor,
+        tokenizer=tokenizer,
+    )
     model = Wav2Vec2ForCTC.from_pretrained(model_id, **kwargs).to("cpu").eval()
     return processor, model
 
@@ -555,9 +569,8 @@ def self_test():
         def test_mfa_success_mock_only(self):
             from types import SimpleNamespace
             def fake_mfa(args, **kwargs):
-                dest = Path(args[5])
-                dest.mkdir()
-                (dest / "clip.TextGrid").write_text('File type = "ooTextFile short"\n"TextGrid"\n0\n1\n<exists>\n1\n"IntervalTier"\n"phones"\n0\n1\n1\n0\n1\n"IH1"\n')
+                dest = Path(args[6])
+                dest.write_text('File type = "ooTextFile short"\n"TextGrid"\n0\n1\n<exists>\n1\n"IntervalTier"\n"phones"\n0\n1\n1\n0\n1\n"IH1"\n')
                 return SimpleNamespace(returncode=0)
             with tempfile.TemporaryDirectory() as tmp:
                 with patch("align_audio.subprocess.run", side_effect=fake_mfa):

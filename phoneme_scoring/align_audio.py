@@ -173,6 +173,21 @@ def validate_segments(segments, duration, tolerance=1e-6):
         raise ValueError("No segments")
 
 
+def _normalize_mfa_endpoints(segments, duration):
+    """Clamp only sub-microsecond TextGrid endpoint serialization rounding."""
+    corrections = []
+    for seg in segments:
+        for key, boundary in (("start_sec", 0.0), ("end_sec", duration)):
+            value = seg[key]
+            outside = value < 0 if key == "start_sec" else value > duration
+            if outside and abs(value - boundary) <= 1e-6:
+                corrections.append(dict(segment_id=seg["segment_id"], field=key,
+                                        original_sec=value, corrected_sec=boundary))
+                seg[key] = boundary
+    validate_segments(segments, duration)
+    return corrections
+
+
 def align_audio(audio, transcript, settings, run_dir) -> dict:
     """Invoke pretrained MFA and return available segments or unavailable.
 
@@ -214,7 +229,7 @@ def align_audio(audio, transcript, settings, run_dir) -> dict:
             canonical, stress = split_phone(label)
             segments.append(dict(segment_id=f"p{index:04d}", canonical_phone=canonical,
                                  original_phone=label, stress=stress, start_sec=start, end_sec=end))
-        validate_segments(segments, len(x) / sr)
+        result["boundary_rounding_corrections"] = _normalize_mfa_endpoints(segments, len(x) / sr)
         if not any(s["canonical_phone"].lower() not in ("", "sil", "sp", "spn", "<eps>") for s in segments):
             raise ValueError("No usable speech phones in alignment")
         result.update(status="available", segments=segments, textgrid_path=str(output))

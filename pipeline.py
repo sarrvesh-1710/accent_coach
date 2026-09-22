@@ -1,6 +1,7 @@
 """Sequential CPU integration for the twelve-file laptop prototype.
 
-Paths in settings/prompts are relative to this file, regardless of the shell's
+Prompt paths are relative to this file; scoring paths to phoneme_scoring/settings.json,
+regardless of the shell's
 working directory. Missing settings use Sarrvesh's documented DSP defaults;
 Lucas's optional stages still report their actual availability. No fake scores.
 """
@@ -23,7 +24,7 @@ _LOCK = threading.Lock()
 _REFERENCE_CACHE = OrderedDict()
 _STAGES = ("configuration", "learner_audio", "reference_audio", "learner_dsp",
            "reference_dsp", "comparison", "alignment", "phoneme_scoring", "feedback", "save")
-_USABLE = {"ok", "warning", "scored"}
+_USABLE = {"ok", "warning", "scored", "available"}
 
 
 def json_safe(value):
@@ -142,10 +143,11 @@ def _analyze(result, learner_path, prompt_id, run_dir):
     if prompt is None:
         raise ValueError("Choose one of the available prompts.")
     result["prompt"] = prompt
-    settings_path = BASE_DIR / "settings.json"
+    settings_path = BASE_DIR / "phoneme_scoring" / "settings.json"
     settings = json.loads(settings_path.read_text(encoding="utf-8")) if settings_path.exists() else {}
     if not isinstance(settings, dict):
         raise ValueError("settings.json must contain an object.")
+    settings["_settings_dir"] = str(settings_path.parent.resolve())
     settings = {"sample_rate_hz": 16000, "max_duration_sec": 5, "device": "cpu", **settings}
     if settings["sample_rate_hz"] != 16000 or settings["device"] != "cpu":
         raise ValueError("This milestone requires 16000 Hz audio and device='cpu'.")
@@ -154,7 +156,7 @@ def _analyze(result, learner_path, prompt_id, run_dir):
         raise ValueError("max_duration_sec must be positive and at most 5.")
     result["stage_statuses"]["configuration"] = {"status": "ok", "message": None}
     if not settings_path.exists():
-        result["messages"].append("settings.json is missing; using documented CPU audio/DSP defaults. Add Lucas's settings for alignment and scoring.")
+        result["messages"].append("phoneme_scoring/settings.json is missing; using documented CPU audio/DSP defaults. Add Lucas's settings for alignment and scoring.")
         result["stage_statuses"]["configuration"]["status"] = "warning"
     result["settings"] = settings
     reference = _path(prompt["reference_wav"])
@@ -203,12 +205,12 @@ def _analyze(result, learner_path, prompt_id, run_dir):
     result["learner_dsp"] = _stage(result, "learner_dsp", "dsp_features", "extract_features", learner_audio, settings)
     result["comparison"] = _stage(result, "comparison", "compare_audio", "compare_audio", learner_audio,
                                    reference_audio, result["learner_dsp"], reference_dsp, settings)
-    result["alignment"] = _stage(result, "alignment", "align_audio", "align_audio", learner_audio,
+    result["alignment"] = _stage(result, "alignment", "phoneme_scoring.align_audio", "align_audio", str(saved_audio),
                                   prompt["text"], settings, str(run_dir),
                                   validator=lambda x: _validate_alignment(x, learner_audio["duration_sec"]))
     if _usable(result["alignment"]):
-        result["phoneme_results"] = _stage(result, "phoneme_scoring", "gop_score", "score_phonemes",
-            learner_audio, result["alignment"], settings,
+        result["phoneme_results"] = _stage(result, "phoneme_scoring", "phoneme_scoring.gop_score", "score_phonemes",
+            str(saved_audio), result["alignment"], settings,
             validator=lambda x: _validate_scores(x, result["alignment"]))
     statuses = result["stage_statuses"]
     required = ("learner_dsp", "reference_dsp", "comparison", "alignment", "phoneme_scoring")

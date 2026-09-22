@@ -51,8 +51,16 @@ from unittest.mock import patch
 import numpy as np
 from scipy.io import wavfile
 
-from align_audio import (align_audio, config_path, load_settings, parse_textgrid,
-                         phone_tier, prepare_audio, split_phone, validate_segments)
+from importlib import import_module
+_alignment_module = import_module(".align_audio", __package__) if __package__ else import_module("align_audio")
+align_audio = _alignment_module.align_audio
+config_path = _alignment_module.config_path
+load_settings = _alignment_module.load_settings
+parse_textgrid = _alignment_module.parse_textgrid
+phone_tier = _alignment_module.phone_tier
+prepare_audio = _alignment_module.prepare_audio
+split_phone = _alignment_module.split_phone
+validate_segments = _alignment_module.validate_segments
 
 UNITS = "natural_log_ratio_nats"
 
@@ -557,12 +565,12 @@ def self_test():
 
         def test_mfa_failures(self):
             with tempfile.TemporaryDirectory() as tmp:
-                with patch("align_audio.subprocess.run", side_effect=FileNotFoundError("mfa missing")):
+                with patch.object(_alignment_module.subprocess, "run", side_effect=FileNotFoundError("mfa missing")):
                     self.assertEqual(align_audio(self.audio, "test", self.settings, tmp)["status"], "unavailable")
-                with patch("align_audio.subprocess.run") as run:
+                with patch.object(_alignment_module.subprocess, "run") as run:
                     run.return_value.returncode = 0
                     self.assertIn("missing", align_audio(self.audio, "test", self.settings, tmp)["reason"])
-                with patch("align_audio.subprocess.run") as run:
+                with patch.object(_alignment_module.subprocess, "run") as run:
                     run.return_value.returncode = 1
                     self.assertIn("exited 1", align_audio(self.audio, "test", self.settings, tmp)["reason"])
 
@@ -573,7 +581,7 @@ def self_test():
                 dest.write_text('File type = "ooTextFile short"\n"TextGrid"\n0\n1\n<exists>\n1\n"IntervalTier"\n"phones"\n0\n1\n1\n0\n1\n"IH1"\n')
                 return SimpleNamespace(returncode=0)
             with tempfile.TemporaryDirectory() as tmp:
-                with patch("align_audio.subprocess.run", side_effect=fake_mfa):
+                with patch.object(_alignment_module.subprocess, "run", side_effect=fake_mfa):
                     result = align_audio(self.audio, "test", self.settings, tmp)
                 self.assertEqual(result["status"], "available")
                 self.assertEqual(result["segments"][0]["stress"], 1)

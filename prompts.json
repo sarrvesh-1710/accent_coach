@@ -1,0 +1,26 @@
+[
+  {
+    "id": "think",
+    "text": "I think so",
+    "reference_wav": "data/references/think.wav",
+    "target_words": ["think"],
+    "target_phones": ["TH"],
+    "lesson_links": [{"title": "Learn this sound: TH consonants", "url": "https://rachelsenglish.com/english-pronounce-th-consonants/"}]
+  },
+  {
+    "id": "ship",
+    "text": "The ship is here",
+    "reference_wav": "data/references/ship.wav",
+    "target_words": ["ship"],
+    "target_phones": ["IH", "IY"],
+    "lesson_links": [{"title": "Learn this sound: IH and the IH/EE contrast", "url": "https://rachelsenglish.com/english-pronounce-ih-vowel/"}]
+  },
+  {
+    "id": "bad_bed",
+    "text": "That is a bad bed",
+    "reference_wav": "data/references/bad_bed.wav",
+    "target_words": ["bad", "bed"],
+    "target_phones": ["AE", "EH"],
+    "lesson_links": [{"title": "Learn this sound: AA as in bad", "url": "https://rachelsenglish.com/english-pronounce-aa-ae-vowel/"}]
+  }
+]

@@ -15,6 +15,10 @@ import soundfile as sf
 
 import app
 import pipeline
+from phoneme_scoring.align_audio import prepare_audio as prepare_scoring_audio, config_path
+from phoneme_scoring.gop_score import score_phonemes
+
+SCORING_DIR = Path(pipeline.__file__).parent / "phoneme_scoring"
 
 
 @contextmanager
@@ -39,6 +43,10 @@ class PipelineTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
+        (self.root / "phoneme_scoring").mkdir()
+        for name in ("settings.json", "phoneme_map.json"):
+            (self.root / "phoneme_scoring" / name).write_text(
+                (SCORING_DIR / name).read_text(encoding="utf-8"), encoding="utf-8")
         self.patch = patch.object(pipeline, "BASE_DIR", self.root)
         self.patch.start()
         self.addCleanup(self.patch.stop)
@@ -51,23 +59,35 @@ class PipelineTests(unittest.TestCase):
         self.learner = self.root / "learner.wav"
         sf.write(self.learner, self.tone, 16000)
         sf.write(self.root / "reference.wav", self.tone, 16000)
-        self.alignment = {"status": "ok", "segments": [
+        self.alignment = {"status": "available", "segments": [
             {"segment_id": "first", "canonical_phone": "TH", "start_sec": 0.1, "end_sec": .4},
             {"segment_id": "second", "canonical_phone": "IH", "start_sec": .5, "end_sec": .8}]}
-        self.scores = {"status": "ok", "segments": [
+        self.scores = {"status": "available", "segments": [
             {"segment_id": "second", "raw_score": np.float32(-2), "score_units": "natural_log", "competing_phone": "IY", "status": "scored"},
             {"segment_id": "first", "raw_score": -1.0, "score_units": "natural_log", "competing_phone": "S", "status": "scored"}]}
 
     def modules(self, score=None, alignment=None):
-        def align(*args):
-            return deepcopy(self.alignment if alignment is None else alignment)
-        def scoring(*args):
+        captured = {}
+        def align(audio, transcript, settings, run_dir):
+            self.assertIsInstance(audio, str)
+            self.assertEqual(Path(audio).parent, Path(run_dir))
+            self.assertEqual(transcript, self.prompt["text"])
+            self.assertTrue(config_path(settings["scoring"]["map_path"], settings).is_file())
+            _, _, fingerprint = prepare_scoring_audio(audio, settings)
+            captured.update(audio=audio, settings=deepcopy(settings), fingerprint=fingerprint)
+            output = deepcopy(self.alignment if alignment is None else alignment)
+            output["audio_sha256"] = fingerprint
+            return output
+        def scoring(audio, aligned, settings):
+            self.assertEqual(audio, captured["audio"])
+            self.assertEqual(settings, captured["settings"])
+            self.assertEqual(prepare_scoring_audio(audio, settings)[2], aligned["audio_sha256"])
             if isinstance(score, Exception):
                 raise score
             return deepcopy(self.scores if score is None else score)
         return substitute_modules({
-            "align_audio": types.SimpleNamespace(align_audio=align),
-            "gop_score": types.SimpleNamespace(score_phonemes=scoring)})
+            "phoneme_scoring.align_audio": types.SimpleNamespace(align_audio=align),
+            "phoneme_scoring.gop_score": types.SimpleNamespace(score_phonemes=scoring)})
 
     def attempt(self):
         result = pipeline.run_attempt(str(self.learner), "test")
@@ -99,7 +119,7 @@ class PipelineTests(unittest.TestCase):
         self.assertTrue(all(row[-1] == "unavailable" for row in app.evidence_rows(result)))
 
     def test_missing_alignment_module_is_partial(self):
-        with substitute_modules({"align_audio": None}):
+        with substitute_modules({"phoneme_scoring.align_audio": None}):
             result = self.attempt()
         self.assertEqual(result["overall_status"], "partial")
         self.assertEqual(result["stage_statuses"]["phoneme_scoring"]["status"], "skipped")
@@ -138,7 +158,7 @@ class PipelineTests(unittest.TestCase):
     def test_uncertain_or_incomplete_scores_never_complete(self):
         uncertain = deepcopy(self.scores)
         uncertain["segments"][0]["status"] = "uncertain"
-        for scores in (uncertain, {"status": "ok", "segments": self.scores["segments"][:1]}):
+        for scores in (uncertain, {"status": "available", "segments": self.scores["segments"][:1]}):
             with self.subTest(scores=scores), self.modules(score=scores):
                 self.assertEqual(self.attempt()["overall_status"], "partial")
 
@@ -152,7 +172,10 @@ class PipelineTests(unittest.TestCase):
     def test_settings_and_reference_change_invalidate_cache(self):
         with self.modules():
             self.attempt()
-            (self.root / "settings.json").write_text('{"pitch_floor_hz": 80}', encoding="utf-8")
+            settings_path = self.root / "phoneme_scoring" / "settings.json"
+            settings = json.loads(settings_path.read_text(encoding="utf-8"))
+            settings["pitch_floor_hz"] = 80
+            settings_path.write_text(json.dumps(settings), encoding="utf-8")
             changed = self.attempt()
             self.assertNotIn("cached", changed["stage_statuses"]["reference_dsp"])
             sf.write(self.root / "reference.wav", self.tone[:16000], 16000)
@@ -160,7 +183,7 @@ class PipelineTests(unittest.TestCase):
             self.assertNotIn("cached", replaced["stage_statuses"]["reference_dsp"])
 
     def test_bad_settings_and_unknown_prompt_save_failure(self):
-        (self.root / "settings.json").write_text('{"device": "cuda"}', encoding="utf-8")
+        (self.root / "phoneme_scoring" / "settings.json").write_text('{"device": "cuda"}', encoding="utf-8")
         self.assertEqual(self.attempt()["overall_status"], "failed")
         result = pipeline.run_attempt(str(self.learner), "unknown")
         self.assertEqual(result["overall_status"], "failed")

@@ -30,7 +30,11 @@ target. The learner must read the selected text; this application does not verif
 the transcript with speech recognition.
 
 Lucas's `settings.json`, `align_audio.py`, `gop_score.py`, and `phoneme_map.json`
-belong beside the application files. Until settings arrive, the pipeline uses
+belong in `phoneme_scoring/`. The pipeline imports that package and resolves
+scoring configuration paths relative to its `settings.json`. Both alignment
+and scoring receive the same saved learner WAV; DSP stages use prepared arrays.
+Lucas's `available` status is validated and accepted as a successful stage.
+Until settings arrive, the pipeline uses
 Sarrvesh's documented default settings (16 kHz, five seconds, CPU) and reports
 that fallback. Without alignment/scoring, valid acoustic comparisons produce an
 explicit partial result. No fabricated scores or overall percentages are shown.

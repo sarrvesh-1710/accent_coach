@@ -9,7 +9,8 @@ def make_feedback(result, prompt) -> list[str]:
     if state == "failed":
         messages.append("Analysis unavailable. Check the stage messages and try again.")
     elif state == "partial":
-        messages.append("Partial result: this is not a complete pronunciation analysis.")
+        messages.append("Some evidence is limited or unavailable. This is not a pronunciation failure.")
+    messages.append("Pronunciation grade unavailable: pass/fail rules have not been validated.")
     comparison = result.get("comparison", {})
     ratio = comparison.get("duration_ratio")
     if (comparison.get("status") in {"ok", "warning"}
@@ -22,13 +23,17 @@ def make_feedback(result, prompt) -> list[str]:
             messages.append(f"{who}: acoustic measurements unavailable.")
         elif not any(dsp.get("voiced_mask", [])):
             messages.append(f"{who}: reliable voiced pitch unavailable.")
+        if dsp.get("pitch_rejected_frames", 0):
+            messages.append(f"{who}: {dsp['pitch_rejected_frames']} pitch estimate(s) were omitted by quality checks; gaps do not indicate pronunciation errors.")
     evidence = result.get("phoneme_results", {})
     segments = evidence.get("segments", [])
     if evidence.get("status") == "unavailable" or not segments:
-        messages.append("Phoneme evidence is unavailable; no sound error has been detected by this analysis.")
+        messages.append("Phoneme evidence is unavailable. Pronunciation errors could not be assessed for this attempt.")
     else:
-        count = sum(s.get("status") == "scored" for s in segments)
-        messages.append(f"Preliminary model evidence is available for {count} segment(s). Raw scores are not confidence percentages or confirmed errors.")
+        uncertain = sum(s.get("status") == "uncertain" for s in segments)
+        diagnostic = sum(isinstance(s.get("expected_vs_alternative_nats"), (int, float)) and math.isfinite(s["expected_vs_alternative_nats"]) for s in segments)
+        sparse = sum(s.get("evidence_quality") == "sparse" for s in segments)
+        messages.append(f"{diagnostic} sound(s) have diagnostic model comparisons; {sparse} use a single CTC frame. {uncertain} sound(s) remain uncertain. These counts are not pronunciation grades.")
         if any(s.get("status") in {"uncertain", "unsupported"} for s in segments):
             messages.append("Some sounds are uncertain or unsupported; no error judgment is made for those segments.")
     cues = {

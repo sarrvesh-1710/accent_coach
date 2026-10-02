@@ -1,0 +1,6 @@
+# CPU neural scoring, used alongside requirements.txt.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.14.0+cpu
+transformers==5.17.0
+huggingface-hub==1.33.0
+phonemizer==3.4.0

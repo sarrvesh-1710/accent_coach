@@ -220,3 +220,6 @@ __marimo__/
 /data/
 /runs/
 /models/
+phoneme_scoring/settings.local.json
+phoneme_scoring/runs/
+phoneme_scoring/L2-ARCTIC/

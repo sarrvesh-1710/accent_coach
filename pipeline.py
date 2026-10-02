@@ -18,6 +18,7 @@ import threading
 import uuid
 
 from feedback import make_feedback
+from phoneme_scoring.align_audio import load_settings
 
 BASE_DIR = Path(__file__).resolve().parent
 _LOCK = threading.Lock()
@@ -88,25 +89,37 @@ def _validate_alignment(output, duration):
 
 def _validate_scores(output, alignment):
     expected = {segment["segment_id"] for segment in alignment["segments"]}
+    silence = {s["segment_id"] for s in alignment["segments"]
+               if s["canonical_phone"].lower() in {"", "sil", "sp", "<eps>"}}
     seen = set()
     for segment in output.get("segments", []):
         identity = segment["segment_id"]
         if identity not in expected or identity in seen:
             raise ValueError("Scores must join uniquely to alignment by segment_id.")
         seen.add(identity)
-        if segment.get("status") not in {"scored", "uncertain", "unsupported"}:
-            raise ValueError("Phoneme status must be scored, uncertain or unsupported.")
+        if segment.get("status") not in {"scored", "uncertain", "unsupported", "skipped"}:
+            raise ValueError("Invalid phoneme status.")
+        if segment["status"] == "skipped" and (
+            identity not in silence or segment.get("reason") != "silence" or segment.get("raw_score") is not None
+        ):
+            raise ValueError("Only aligned silence may be skipped without a score.")
         if segment["status"] == "scored" and (
             not _number(segment.get("raw_score")) or not segment.get("score_units")
         ):
             raise ValueError("Scored segments require a finite raw_score and score_units.")
+        if "expected_vs_alternative_nats" in segment and not _number(segment["expected_vs_alternative_nats"]):
+            raise ValueError("Diagnostic model margins must be finite.")
     if not seen:
         raise ValueError("No phoneme evidence was returned.")
     if seen != expected:
         output["status"] = "partial"
         output["reason"] = "Some aligned segments have no scoring result."
-    elif any(s["status"] != "scored" for s in output["segments"]):
+    elif any(s["status"] != "scored" for s in output["segments"] if s["segment_id"] not in silence):
         output["status"] = "uncertain"
+        output["reason"] = "Some speech sounds have uncertain or unsupported model evidence."
+    elif not (expected - silence):
+        output["status"] = "uncertain"
+        output["reason"] = "No speech sounds were available for scoring."
 
 
 def _stage(result, name, module, function, *args, validator=None):
@@ -144,7 +157,7 @@ def _analyze(result, learner_path, prompt_id, run_dir):
         raise ValueError("Choose one of the available prompts.")
     result["prompt"] = prompt
     settings_path = BASE_DIR / "phoneme_scoring" / "settings.json"
-    settings = json.loads(settings_path.read_text(encoding="utf-8")) if settings_path.exists() else {}
+    settings = load_settings(settings_path) if settings_path.exists() else {}
     if not isinstance(settings, dict):
         raise ValueError("settings.json must contain an object.")
     settings["_settings_dir"] = str(settings_path.parent.resolve())

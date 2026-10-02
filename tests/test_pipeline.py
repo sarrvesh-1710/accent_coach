@@ -63,8 +63,8 @@ class PipelineTests(unittest.TestCase):
             {"segment_id": "first", "canonical_phone": "TH", "start_sec": 0.1, "end_sec": .4},
             {"segment_id": "second", "canonical_phone": "IH", "start_sec": .5, "end_sec": .8}]}
         self.scores = {"status": "available", "segments": [
-            {"segment_id": "second", "raw_score": np.float32(-2), "score_units": "natural_log", "competing_phone": "IY", "status": "scored"},
-            {"segment_id": "first", "raw_score": -1.0, "score_units": "natural_log", "competing_phone": "S", "status": "scored"}]}
+            {"segment_id": "second", "raw_score": np.float32(-2), "expected_vs_alternative_nats": -2., "score_units": "natural_log", "competing_phone": "IY", "status": "scored"},
+            {"segment_id": "first", "raw_score": 0., "expected_vs_alternative_nats": 3., "score_units": "natural_log", "competing_phone": "S", "status": "scored"}]}
 
     def modules(self, score=None, alignment=None):
         captured = {}
@@ -107,8 +107,10 @@ class PipelineTests(unittest.TestCase):
         self.assertTrue(second["stage_statuses"]["reference_dsp"]["cached"])
         self.assertAlmostEqual(first["comparison"]["duration_ratio"], 1)
         self.assertAlmostEqual(first["comparison"]["dtw_distance"], 0)
-        self.assertEqual(app.evidence_rows(first)[0][4], -1)
+        self.assertEqual(app.evidence_rows(first)[0][4], 3)
         self.assertIn("<svg", app.pitch_html(first))
+        self.assertIn("contours overlap", app.pitch_html(first))
+        self.assertIn("2.00 s", app.pitch_html(first))
 
     def test_gop_failure_preserves_acoustics(self):
         with self.modules(score=RuntimeError("model unavailable")):
@@ -123,12 +125,47 @@ class PipelineTests(unittest.TestCase):
             result = self.attempt()
         self.assertEqual(result["overall_status"], "partial")
         self.assertEqual(result["stage_statuses"]["phoneme_scoring"]["status"], "skipped")
+        self.assertIn("Alignment:", app.result_views(result)[0])
+
+    def test_silence_is_skipped_without_hiding_uncertain_speech(self):
+        alignment = deepcopy(self.alignment)
+        alignment["segments"].append({"segment_id": "quiet", "canonical_phone": "sil",
+                                     "start_sec": 1.0, "end_sec": 1.5})
+        scores = deepcopy(self.scores)
+        scores["segments"].append({"segment_id": "quiet", "status": "skipped",
+                                   "reason": "silence", "raw_score": None})
+        with self.modules(score=scores, alignment=alignment):
+            self.assertEqual(self.attempt()["overall_status"], "complete")
+        scores["segments"][0]["status"] = "uncertain"
+        with self.modules(score=scores, alignment=alignment):
+            self.assertEqual(self.attempt()["overall_status"], "partial")
+
+    def test_speech_cannot_be_marked_skipped(self):
+        scores = deepcopy(self.scores)
+        scores["segments"][0].update(status="skipped", reason="silence", raw_score=None)
+        with self.modules(score=scores):
+            result = self.attempt()
+        self.assertEqual(result["stage_statuses"]["phoneme_scoring"]["status"], "unavailable")
+
+    def test_local_settings_override_preserves_shared_options(self):
+        local = self.root / "phoneme_scoring" / "settings.local.json"
+        command = ["conda", "run", "-n", "test-aligner", "mfa"]
+        local.write_text(json.dumps({"mfa": {"command": command}}), encoding="utf-8")
+        with self.modules():
+            result = self.attempt()
+        self.assertEqual(result["settings"]["mfa"]["command"], command)
+        self.assertEqual(result["settings"]["mfa"]["dictionary"], "english_us_arpa")
 
     def test_missing_reference_rejected(self):
         (self.root / "reference.wav").unlink()
         result = self.attempt()
         self.assertEqual(result["overall_status"], "failed")
         self.assertIn("Missing reference", " ".join(result["messages"]))
+        visible_status = app.result_views(result)[0]
+        self.assertIn("Missing reference WAV", visible_status)
+        self.assertIn(str(self.root / "reference.wav"), visible_status)
+        self.assertIn(self.prompt["text"], visible_status)
+        self.assertIn("click Analyze again", visible_status)
 
     def test_silence_rejected_and_retry_has_no_stale_results(self):
         with self.modules():
@@ -165,6 +202,10 @@ class PipelineTests(unittest.TestCase):
     def test_nonfinite_scores_rejected_and_json_null(self):
         scores = deepcopy(self.scores)
         scores["segments"][0]["raw_score"] = float("nan")
+        with self.modules(score=scores):
+            self.assertEqual(self.attempt()["stage_statuses"]["phoneme_scoring"]["status"], "unavailable")
+        scores = deepcopy(self.scores)
+        scores["segments"][0]["expected_vs_alternative_nats"] = float("inf")
         with self.modules(score=scores):
             self.assertEqual(self.attempt()["stage_statuses"]["phoneme_scoring"]["status"], "unavailable")
         self.assertEqual(pipeline.json_safe({"array": np.array([np.nan, np.inf, 3]), "samples": self.tone}), {"array": [None, None, 3.0]})
@@ -205,7 +246,8 @@ class PipelineTests(unittest.TestCase):
             self.assertIsNone(first[4])
             self.assertFalse(first[-1]["interactive"])
             last = next(generator)
-            self.assertIn("Analysis complete", last[0])
+            self.assertIn("Analysis finished", last[0])
+            self.assertIn("Pronunciation grade unavailable", last[0])
             self.assertTrue(last[-1]["interactive"])
         demo.close()
 

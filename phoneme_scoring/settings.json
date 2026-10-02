@@ -4,7 +4,7 @@
   "device": "cpu",
   "model": {
     "id": "facebook/wav2vec2-xlsr-53-espeak-cv-ft",
-    "revision": "main",
+    "revision": "2c733782da5604684829819a5eb744c193fe9398",
     "cache_dir": null,
     "local_files_only": false,
     "cpu_threads": 2
@@ -28,11 +28,11 @@
   "scoring": {
     "map_path": "phoneme_map.json",
     "min_evidence_frames": 1,
-    "min_evidence_fraction": 0.05,
+    "min_evidence_fraction": 0.0,
     "min_top_phone_probability": 0.1,
     "min_phonetic_mass": 0.15,
     "min_winner_margin_nats": 0.2,
-    "notes": "These are provisional evidence-quality gates, NOT correct/incorrect thresholds. Full non-special multilingual vocabulary is the competitor inventory. CTC spikes are sparse, so one retained frame is allowed but reported. No calibration or training."
+    "notes": "CTC-aware diagnostic comparisons: one qualified nonblank frame can yield a comparison, explicitly marked sparse/uncertain. Blank occupancy is reported, not used as a default duration-dependent rejection rule. Probability, phonetic-mass and winner-margin gates remain experimental. Positive expected-vs-alternative margins favor the expected token, not pronunciation correctness. No calibration or training."
   },
   "prompts": [],
   "prompt_note": "Paste the three exact app prompt texts here; they were not supplied. The complete standard ARPA map includes requested target contrasts.",

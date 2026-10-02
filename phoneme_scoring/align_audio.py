@@ -22,6 +22,14 @@ def load_settings(settings):
     if isinstance(settings, (str, Path)):
         path = Path(settings).expanduser().resolve()
         result = json.loads(path.read_text(encoding="utf-8"))
+        local = path.with_name("settings.local.json")
+        if local.is_file() and local != path:
+            overrides = json.loads(local.read_text(encoding="utf-8"))
+            for key, value in overrides.items():
+                if isinstance(value, dict) and isinstance(result.get(key), dict):
+                    result[key] = {**result[key], **value}
+                else:
+                    result[key] = value
         result["_settings_dir"] = str(path.parent)
         return result
     return dict(settings)
@@ -210,15 +218,24 @@ def align_audio(audio, transcript, settings, run_dir) -> dict:
         cfg = settings["mfa"]
         # align_one avoids the corpus-level export/multiprocessing path, which
         # can hang on Windows after lattice alignment for a one-file corpus.
-        args = [cfg["executable"], "align_one", str(corpus / "clip.wav"),
+        command = cfg.get("command", [cfg["executable"]])
+        if not isinstance(command, list) or not command or not all(isinstance(v, str) and v for v in command):
+            raise ValueError("mfa.command must be a nonempty list of command arguments")
+        args = [*command, "align_one", str(corpus / "clip.wav"),
                 str(corpus / "clip.lab"), cfg["dictionary"], cfg["acoustic_model"],
                 str(output), "--output_format", "long_textgrid", "--no_use_mp",
                 "--temporary_directory", str(work / "temp")]
         result.update(run_dir=str(work), audio_sha256=fingerprint, duration_sec=len(x) / sr,
                       sample_rate_hz=sr, transcript=transcript, command=args)
         with (work / "mfa.log").open("w", encoding="utf-8") as log:
-            process = subprocess.run(args, stdout=log, stderr=subprocess.STDOUT,
-                                     timeout=cfg["timeout_sec"], check=False)
+            try:
+                process = subprocess.run(args, stdout=log, stderr=subprocess.STDOUT,
+                                         timeout=cfg["timeout_sec"], check=False,
+                                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            except FileNotFoundError as exc:
+                raise RuntimeError("MFA could not start. Install its Conda environment and configure "
+                                   "mfa.command in phoneme_scoring/settings.local.json. "
+                                   f"Missing command: {command[0]}") from exc
         if process.returncode:
             raise RuntimeError(f"MFA exited {process.returncode}; inspect {work / 'mfa.log'}")
         if not output.is_file() or output.stat().st_size == 0:

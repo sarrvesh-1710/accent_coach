@@ -1,11 +1,11 @@
 """Preliminary CTC segment evidence, NOT a calibrated GOP/error classifier.
 
-Install in an MFA conda environment (Python 3.11 recommended):
-  python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
-  python -m pip install 'transformers>=4.40,<5' numpy scipy phonemizer
+Install from the project root in the app environment:
+  python -m pip install -r requirements.txt -r requirements-scoring.txt
+Install MFA separately in a Conda environment (see README):
   mfa model download dictionary english_us_arpa
   mfa model download acoustic english_us_arpa
-The processor may also require the eSpeak-NG system package.
+The tokenizer uses do_phonemize=False, so inference does not require eSpeak-NG.
 
 Commands (run from the directory containing these four files):
   python gop_score.py --self-test
@@ -24,6 +24,8 @@ Score on evidence frames E:
   mean_E ln P(expected|frame) - max_q mean_E ln P(q|frame)
 where q ranges over ALL non-special phonetic tokenizer labels (includes expected).
 This score is <= 0 in natural-log units (nats), NOT dB, accuracy, or confidence.
+The UI displays expected_vs_alternative_nats instead: expected minus best OTHER
+label, a signed diagnostic margin. Single-frame results remain uncertain/sparse.
 competing_phone is the best OTHER label. CTC pooling is a provisional proxy,
 not a CTC sequence likelihood or validated pronunciation metric. No error labels
 are emitted, and low scores alone never determine status. Frame centers use
@@ -131,7 +133,8 @@ def _row(seg, status, reason=None):
 
 
 def _score_logprobs(logp, centers, segments, mapping, vocab, special_ids, cfg):
-    if cfg["min_evidence_frames"] < 1 or cfg["min_winner_margin_nats"] < 0:
+    if (not isinstance(cfg["min_evidence_frames"], int) or isinstance(cfg["min_evidence_frames"], bool)
+            or cfg["min_evidence_frames"] < 1 or cfg["min_winner_margin_nats"] < 0):
         raise ValueError("Invalid evidence frame/margin settings")
     for key in ("min_evidence_fraction", "min_top_phone_probability", "min_phonetic_mass"):
         if not 0 <= cfg[key] <= 1:
@@ -154,7 +157,7 @@ def _score_logprobs(logp, centers, segments, mapping, vocab, special_ids, cfg):
     for seg in segments:
         target, reason = _resolve(seg, mapping)
         if reason:
-            rows.append(_row(seg, "unsupported", reason))
+            rows.append(_row(seg, "skipped" if reason == "silence" else "unsupported", reason))
             continue
         if target not in vocab or vocab[target] in special_ids:
             rows.append(_row(seg, "unsupported", "target_not_in_real_tokenizer"))
@@ -165,9 +168,16 @@ def _score_logprobs(logp, centers, segments, mapping, vocab, special_ids, cfg):
         row = _row(seg, "uncertain", "insufficient_phonetic_evidence")
         row.update(target_token=target, target_token_id=vocab[target],
                    total_frames=total, evidence_frames=retained,
+                   required_evidence_frames=cfg["min_evidence_frames"],
+                   required_evidence_fraction=cfg["min_evidence_fraction"],
                    evidence_fraction=retained / total if total else 0.0,
                    blank_or_special_frames=int((region & ~np.isin(global_winners, candidates)).sum()))
-        if retained < cfg["min_evidence_frames"] or row["evidence_fraction"] < cfg["min_evidence_fraction"]:
+        if retained < cfg["min_evidence_frames"]:
+            row["reason"] = "insufficient_evidence_frames"
+            rows.append(row)
+            continue
+        if row["evidence_fraction"] < cfg["min_evidence_fraction"]:
+            row["reason"] = "insufficient_evidence_fraction"
             rows.append(row)
             continue
         mean_logp = logp[keep].mean(axis=0)
@@ -176,10 +186,13 @@ def _score_logprobs(logp, centers, segments, mapping, vocab, special_ids, cfg):
         alternative = next(int(i) for i in ranked if i != vocab[target])
         margin = float(mean_logp[ranked[0]] - mean_logp[ranked[1]])
         ambiguous = margin < cfg["min_winner_margin_nats"]
+        sparse = retained == 1
         row.update(raw_score=float(mean_logp[vocab[target]] - mean_logp[best]),
+                   expected_vs_alternative_nats=float(mean_logp[vocab[target]] - mean_logp[alternative]),
+                   evidence_quality="sparse" if sparse else "multiple_frames",
                    competing_phone=inverse[alternative], winning_phone=inverse[best],
-                   winner_margin_nats=margin, status="uncertain" if ambiguous else "scored",
-                   reason="ambiguous_acoustic_winner" if ambiguous else None)
+                   winner_margin_nats=margin, status="uncertain" if ambiguous or sparse else "scored",
+                   reason="ambiguous_acoustic_winner" if ambiguous else "single_ctc_frame" if sparse else None)
         rows.append(row)
     return rows
 
@@ -530,6 +543,7 @@ def self_test():
     class Tests(unittest.TestCase):
         def setUp(self):
             self.settings = load_settings(Path(__file__).with_name("settings.json"))
+            self.settings["mfa"].pop("command", None)  # Offline mocks use the default command shape.
             self.mapping = _mapping(self.settings)
             self.audio = (np.sin(np.arange(16000) * 0.1).astype(np.float32) * 0.1, 16000)
 
@@ -674,6 +688,9 @@ def self_test():
             self.assertAlmostEqual(centers[0], 199.5 / 16000)
 
         def test_ctc_blank_and_scores(self):
+            # This test exercises score arithmetic with two retained frames;
+            # sparse single-frame diagnostics are covered by the evidence tests.
+            self.settings["scoring"]["min_evidence_frames"] = 2
             vocab = {"<pad>": 0, "θ": 1, "s": 2, "æ": 3}
             segments = [dict(segment_id="a", canonical_phone="TH", start_sec=0, end_sec=0.5),
                         dict(segment_id="b", canonical_phone="sil", start_sec=0.5, end_sec=0.7),
@@ -684,7 +701,7 @@ def self_test():
             self.assertAlmostEqual(rows[0]["raw_score"], -3)
             self.assertEqual(rows[0]["evidence_frames"], 2)
             self.assertEqual(rows[0]["competing_phone"], "s")
-            self.assertEqual([r["status"] for r in rows], ["scored", "unsupported", "unsupported"])
+            self.assertEqual([r["status"] for r in rows], ["scored", "skipped", "unsupported"])
             blank = np.tile([10., 0, 0, 0], (3, 1))
             blank -= np.logaddexp.reduce(blank, axis=1)[:, None]
             rows = _score_logprobs(blank, np.array([0.01, 0.1, 0.2]), segments, self.mapping, vocab, {0}, self.settings["scoring"])

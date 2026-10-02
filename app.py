@@ -37,7 +37,9 @@ def pitch_html(result):
         series.append((label, color, points))
     if not all_points:
         return "<p>Pitch comparison unavailable: no reliable voiced frames.</p>"
-    xmax = max(max(t for t, y in all_points), 0.1)
+    durations = [result.get(key, {}).get("duration_sec") for key in ("learner_audio", "reference_audio")]
+    xmax = max([max(t for t, y in all_points), 0.1] +
+               [t for t in durations if isinstance(t, (int, float)) and math.isfinite(t) and t > 0])
     low = min(-1, min(y for t, y in all_points))
     high = max(1, max(y for t, y in all_points))
     def xy(t, y):
@@ -60,9 +62,12 @@ def pitch_html(result):
             path.append(f'{"L" if pen else "M"}{x:.2f},{y:.2f}')
             pen = True
             parts.append(f'<circle cx="{x:.2f}" cy="{y:.2f}" r="1.5" fill="{color}"/>')
-        parts.append(f'<path d="{" ".join(path)}" fill="none" stroke="{color}" stroke-width="2"/>')
+        dash = ' stroke-dasharray="5 4"' if index else ''
+        width = 1.5 if index else 3
+        parts.append(f'<path d="{" ".join(path)}" fill="none" stroke="{color}" stroke-width="{width}"{dash}/>')
         parts.append(f'<text x="{60 + index * 150}" y="266" fill="{color}">{label}</text>')
-    return "".join(parts) + "</svg><p>Original timestamps; contours are not time-warped. Gaps indicate unavailable pitch. DTW comparison arrays are in the saved measurements.</p>"
+    overlap = "<p>The original and reference pitch contours overlap.</p>" if series[0][2] == series[1][2] else ""
+    return "".join(parts) + "</svg>" + overlap + "<p>Original timestamps; contours are not time-warped. Gaps indicate unvoiced or unreliable pitch and are not pronunciation errors. Pitch is estimated from a filtered analysis copy; playback uses the original recording. DTW comparison arrays are in the saved measurements.</p>"
 
 
 def evidence_rows(result):
@@ -70,20 +75,40 @@ def evidence_rows(result):
     rows = []
     for segment in result.get("alignment", {}).get("segments", []):
         score = scores.get(segment["segment_id"], {})
+        detail = (score.get("reason") or "").replace("_", " ")
+        if score.get("reason") == "insufficient_evidence_frames":
+            detail = f"Only {score.get('evidence_frames', 0)} evidence frame(s); need at least {score.get('required_evidence_frames', '?')}."
+        elif score.get("reason") == "single_ctc_frame":
+            detail = "Single CTC frame; diagnostic comparison only."
+        frames = f"{score['evidence_frames']}/{score['total_frames']}" if "evidence_frames" in score else ""
+        display_status = {"scored": "evidence available", "skipped": "silence skipped"}.get(score.get("status"), score.get("status", "unavailable"))
+        if score.get("reason") == "single_ctc_frame":
+            display_status = "limited evidence"
         rows.append([str(segment["segment_id"]), segment["canonical_phone"],
-                     segment["start_sec"], segment["end_sec"], score.get("raw_score"),
+                     segment["start_sec"], segment["end_sec"], score.get("expected_vs_alternative_nats"),
                      score.get("score_units", ""), score.get("competing_phone") or "",
-                     score.get("status", "unavailable")])
+                     frames, detail, display_status])
     return rows
 
 
 def result_views(result):
     state = result["overall_status"]
-    status = {"complete": "Analysis complete — preliminary evidence only.",
-              "partial": "Partial result — not a complete pronunciation analysis.",
-              "failed": "Analysis unavailable — correct the problem and retry."}[state]
+    status = {"complete": "Analysis finished. Pronunciation grade unavailable.",
+              "partial": "Analysis finished with limited evidence. Pronunciation grade unavailable.",
+              "failed": "Analysis unavailable. Pronunciation grade unavailable. Check the messages below."}[state]
+    reference_stage = result.get("stage_statuses", {}).get("reference_audio", {})
+    if state == "failed" and reference_stage.get("status") == "unavailable":
+        status += "\n" + (reference_stage.get("message") or "Reference recording unavailable.")
+        prompt_text = result.get("prompt", {}).get("text")
+        if prompt_text:
+            status += f'\nThe reference WAV must say: "{prompt_text}". Add or replace it, then click Analyze again.'
     if result.get("results_path"):
         status += f"\nSaved attempt: {result['run_id']}"
+    if state == "partial":
+        for name in ("alignment", "phoneme_scoring"):
+            stage = result.get("stage_statuses", {}).get(name, {})
+            if stage.get("status") in {"unavailable", "uncertain", "partial"}:
+                status += f"\n{name.replace('_', ' ').capitalize()}: {stage.get('message') or stage['status']}"
     messages = "\n".join(result["messages"])
     stage_rows = [[name, stage["status"], stage.get("message") or ""] for name, stage in result["stage_statuses"].items()]
     paths = result["audio_paths"]
@@ -103,8 +128,9 @@ def build_app():
         analyze = gr.Button("Analyze", variant="primary")
         status = gr.Textbox(label="Processing status", value="Ready", interactive=False)
         plot = gr.HTML("<p>Analyze a recording to compare pitch.</p>")
-        evidence = gr.Dataframe(headers=["Segment", "Expected phone", "Start (s)", "End (s)", "Raw score", "Units", "Competing phone", "Status"],
-                                datatype=["str", "str", "number", "number", "number", "str", "str", "str"], interactive=False)
+        gr.Markdown("**Sound evidence**\n\nThese results do not assign pronunciation pass/fail. Model margin compares the expected sound with the strongest alternative: positive favors expected, negative favors the alternative. It is not a confidence percentage. Single-frame comparisons remain limited evidence, not confirmed errors. Evidence frames shows retained/total model frames. Blank cells mean no comparison is available.")
+        evidence = gr.Dataframe(headers=["Segment", "Expected phone", "Start (s)", "End (s)", "Model margin", "Units", "Alternative phone", "Evidence frames", "Details", "Status"],
+                                datatype=["str", "str", "number", "number", "number", "str", "str", "str", "str", "str"], interactive=False)
         feedback = gr.Textbox(label="Observations and practice cues", interactive=False, lines=7)
         lessons = gr.HTML(lesson_html(prompts[0]))
         with gr.Row():
@@ -138,6 +164,9 @@ def build_app():
 
 if __name__ == "__main__":
     try:
-        build_app().queue(default_concurrency_limit=1).launch(server_name="127.0.0.1", share=False, inbrowser=True)
+        base = Path(__file__).resolve().parent
+        build_app().queue(default_concurrency_limit=1).launch(
+            server_name="127.0.0.1", share=False, inbrowser=True,
+            allowed_paths=[str(base / "runs"), str(base / "data" / "references")])
     except ModuleNotFoundError as exc:
         raise SystemExit(f"Missing dependency: {exc.name}. Run python -m pip install -r requirements.txt") from exc

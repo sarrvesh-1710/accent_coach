@@ -14,7 +14,7 @@ py -3.13 -m venv .venv
 To run the app
 
 ```powershell
-cd "C:\Users\sarrv\Documents\Codex\2026-09-15\re\accent_coach"
+--open folder in terminal--
 .\.venv\Scripts\python.exe app.py
 ```
 

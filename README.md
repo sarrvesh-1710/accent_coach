@@ -1,4 +1,7 @@
 # accent_coach
+
+Chinese learner profile: see [START_HERE_CHINESE.md](START_HERE_CHINESE.md) for
+the selectable JSON profile, setup, SpeechOcean evaluation, and calibration.
 TAMU Capstone 403
 
 ## Parthiban: local application and feedback

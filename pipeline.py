@@ -19,6 +19,8 @@ import uuid
 
 from feedback import make_feedback
 from phoneme_scoring.align_audio import load_settings
+from accent_profiles import apply_profile
+from phoneme_scoring.calibration import apply_calibration
 
 BASE_DIR = Path(__file__).resolve().parent
 _LOCK = threading.Lock()
@@ -150,7 +152,7 @@ def _usable(output):
     return output.get("status") in _USABLE
 
 
-def _analyze(result, learner_path, prompt_id, run_dir):
+def _analyze(result, learner_path, prompt_id, run_dir, profile_id="general"):
     prompts = load_prompts()
     prompt = next((p for p in prompts if p["id"] == prompt_id), None)
     if prompt is None:
@@ -162,6 +164,8 @@ def _analyze(result, learner_path, prompt_id, run_dir):
         raise ValueError("settings.json must contain an object.")
     settings["_settings_dir"] = str(settings_path.parent.resolve())
     settings = {"sample_rate_hz": 16000, "max_duration_sec": 5, "device": "cpu", **settings}
+    settings = apply_profile(settings, profile_id)
+    result["accent_profile"] = settings["accent_profile"]
     if settings["sample_rate_hz"] != 16000 or settings["device"] != "cpu":
         raise ValueError("This milestone requires 16000 Hz audio and device='cpu'.")
     limit = settings["max_duration_sec"]
@@ -173,7 +177,7 @@ def _analyze(result, learner_path, prompt_id, run_dir):
         result["stage_statuses"]["configuration"]["status"] = "warning"
     result["settings"] = settings
     reference = _path(prompt["reference_wav"])
-    if not reference.is_file():
+    if not reference.is_file() and profile_id == "general":
         result["stage_statuses"]["reference_audio"] = {"status": "unavailable", "message": f"Missing reference WAV: {reference}"}
         raise ValueError(f"Missing reference WAV: {reference}. Record exactly: {prompt['text']}")
     if not learner_path:
@@ -191,9 +195,9 @@ def _analyze(result, learner_path, prompt_id, run_dir):
     result["audio_paths"]["original"] = str(saved_audio)
     learner_audio["prompt_id"] = prompt_id
     result["learner_audio"]["path"] = str(saved_audio)
-    stat = reference.stat()
-    cache_key = (str(reference), stat.st_mtime_ns, stat.st_size, json.dumps(settings, sort_keys=True))
-    cached = _REFERENCE_CACHE.get(cache_key)
+    stat = reference.stat() if reference.is_file() else None
+    cache_key = (str(reference), stat.st_mtime_ns, stat.st_size, json.dumps(settings, sort_keys=True)) if stat else None
+    cached = _REFERENCE_CACHE.get(cache_key) if cache_key else None
     if cached:
         reference_audio, reference_dsp = deepcopy(cached)
         _REFERENCE_CACHE.move_to_end(cache_key)
@@ -210,10 +214,10 @@ def _analyze(result, learner_path, prompt_id, run_dir):
                 while len(_REFERENCE_CACHE) > 3:
                     _REFERENCE_CACHE.popitem(last=False)
     result["reference_audio"] = json_safe(reference_audio)
-    if not _usable(reference_audio):
+    if not _usable(reference_audio) and profile_id == "general":
         return
     reference_audio["prompt_id"] = prompt_id
-    result["audio_paths"]["reference"] = str(reference)
+    result["audio_paths"]["reference"] = str(reference) if _usable(reference_audio) else None
     result["reference_dsp"] = reference_dsp
     result["learner_dsp"] = _stage(result, "learner_dsp", "dsp_features", "extract_features", learner_audio, settings)
     result["comparison"] = _stage(result, "comparison", "compare_audio", "compare_audio", learner_audio,
@@ -225,6 +229,7 @@ def _analyze(result, learner_path, prompt_id, run_dir):
         result["phoneme_results"] = _stage(result, "phoneme_scoring", "phoneme_scoring.gop_score", "score_phonemes",
             str(saved_audio), result["alignment"], settings,
             validator=lambda x: _validate_scores(x, result["alignment"]))
+        apply_calibration(result["phoneme_results"], settings, BASE_DIR)
     statuses = result["stage_statuses"]
     required = ("learner_dsp", "reference_dsp", "comparison", "alignment", "phoneme_scoring")
     if all(statuses[s]["status"] in _USABLE for s in required):
@@ -233,7 +238,7 @@ def _analyze(result, learner_path, prompt_id, run_dir):
         result["overall_status"] = "partial"
 
 
-def run_attempt(learner_path, prompt_id) -> dict:
+def run_attempt(learner_path, prompt_id, profile_id="general") -> dict:
     """Analyze one attempt; always return a fresh result and try to save its JSON."""
     with _LOCK:  # Also protects reference cache and model calls across UI sessions.
         run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S") + "_" + uuid.uuid4().hex[:12]
@@ -246,7 +251,7 @@ def run_attempt(learner_path, prompt_id) -> dict:
                   "messages": [], "feedback": [], "results_path": None}
         try:
             run_dir.mkdir(parents=True, exist_ok=False)
-            _analyze(result, learner_path, prompt_id, run_dir)
+            _analyze(result, learner_path, prompt_id, run_dir, profile_id)
         except Exception as exc:
             result["messages"].append(str(exc))
             if result["stage_statuses"]["configuration"]["status"] == "skipped":

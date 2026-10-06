@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 os.environ.setdefault("GRADIO_ANALYTICS_ENABLED", "False")
 
 from pipeline import load_prompts, run_attempt
+from accent_profiles import list_profiles
 
 
 def lesson_html(prompt):
@@ -87,7 +88,7 @@ def evidence_rows(result):
         rows.append([str(segment["segment_id"]), segment["canonical_phone"],
                      segment["start_sec"], segment["end_sec"], score.get("expected_vs_alternative_nats"),
                      score.get("score_units", ""), score.get("competing_phone") or "",
-                     frames, detail, display_status])
+                     frames, detail, score.get("predicted_phone_rating"), display_status])
     return rows
 
 
@@ -96,6 +97,8 @@ def result_views(result):
     status = {"complete": "Analysis finished. Pronunciation grade unavailable.",
               "partial": "Analysis finished with limited evidence. Pronunciation grade unavailable.",
               "failed": "Analysis unavailable. Pronunciation grade unavailable. Check the messages below."}[state]
+    if result.get("phoneme_results", {}).get("calibrated"):
+        status = status.replace("Pronunciation grade unavailable.", "Estimated expert phone ratings available; pass/fail unavailable.")
     reference_stage = result.get("stage_statuses", {}).get("reference_audio", {})
     if state == "failed" and reference_stage.get("status") == "unavailable":
         status += "\n" + (reference_stage.get("message") or "Reference recording unavailable.")
@@ -124,13 +127,16 @@ def build_app():
     with gr.Blocks(title="Accent Coach") as demo:
         gr.Markdown("# Accent Coach\nRead the selected sentence exactly and upload a WAV, ideally 2–5 seconds. Feedback is exploratory. Record only with the speaker’s permission.")
         prompt = gr.Dropdown(choices=[(p["text"], p["id"]) for p in prompts], value=prompts[0]["id"], label="Practice sentence")
+        profile = gr.Dropdown(choices=[(p["label"], p["id"]) for p in list_profiles()],
+                              value="general", label="Learner profile")
+        gr.Markdown("Choose **Chinese accent** for Mandarin-speaking learners practicing American English. This selects a learner profile, not a Chinese pronunciation target. Estimated expert ratings appear after SpeechOcean calibration is trained.")
         upload = gr.File(label="Learner WAV (maximum 5 seconds)", file_types=[".wav"], type="filepath")
         analyze = gr.Button("Analyze", variant="primary")
         status = gr.Textbox(label="Processing status", value="Ready", interactive=False)
         plot = gr.HTML("<p>Analyze a recording to compare pitch.</p>")
         gr.Markdown("**Sound evidence**\n\nThese results do not assign pronunciation pass/fail. Model margin compares the expected sound with the strongest alternative: positive favors expected, negative favors the alternative. It is not a confidence percentage. Single-frame comparisons remain limited evidence, not confirmed errors. Evidence frames shows retained/total model frames. Blank cells mean no comparison is available.")
-        evidence = gr.Dataframe(headers=["Segment", "Expected phone", "Start (s)", "End (s)", "Model margin", "Units", "Alternative phone", "Evidence frames", "Details", "Status"],
-                                datatype=["str", "str", "number", "number", "number", "str", "str", "str", "str", "str"], interactive=False)
+        evidence = gr.Dataframe(headers=["Segment", "Expected phone", "Start (s)", "End (s)", "Model margin", "Units", "Alternative phone", "Evidence frames", "Details", "Expert rating estimate (0–2)", "Status"],
+                                datatype=["str", "str", "number", "number", "number", "str", "str", "str", "str", "number", "str"], interactive=False)
         feedback = gr.Textbox(label="Observations and practice cues", interactive=False, lines=7)
         lessons = gr.HTML(lesson_html(prompts[0]))
         with gr.Row():
@@ -147,16 +153,17 @@ def build_app():
         def cleared(message="Ready"):
             return (message, "", [], "", None, None, {}, [], "", None)
 
-        def analyze_attempt(path, identity):
+        def analyze_attempt(path, identity, profile_id):
             # First yield clears old evidence/playback before CPU work starts.
-            yield (*cleared("Processing on CPU…"), gr.update(interactive=False), gr.update(interactive=False), gr.update(interactive=False))
+            yield (*cleared("Processing on CPU…"), gr.update(interactive=False), gr.update(interactive=False), gr.update(interactive=False), gr.update(interactive=False))
             try:
-                views = result_views(run_attempt(path, identity))
+                views = result_views(run_attempt(path, identity, profile_id))
             except Exception as exc:
                 views = cleared(f"Analysis unavailable: {type(exc).__name__}: {exc}")
-            yield (*views, gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True))
+            yield (*views, gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True), gr.update(interactive=True))
 
-        analyze.click(analyze_attempt, [upload, prompt], outputs + [analyze, upload, prompt], concurrency_limit=1)
+        analyze.click(analyze_attempt, [upload, prompt, profile], outputs + [analyze, upload, prompt, profile], concurrency_limit=1)
+        profile.change(lambda: cleared(), outputs=outputs, queue=False)
         prompt.change(lambda identity: (*cleared(), lesson_html(by_id[identity])), prompt, outputs + [lessons], queue=False)
         upload.change(lambda: cleared(), outputs=outputs, queue=False)
     return demo

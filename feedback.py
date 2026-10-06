@@ -10,7 +10,20 @@ def make_feedback(result, prompt) -> list[str]:
         messages.append("Analysis unavailable. Check the stage messages and try again.")
     elif state == "partial":
         messages.append("Some evidence is limited or unavailable. This is not a pronunciation failure.")
-    messages.append("Pronunciation grade unavailable: pass/fail rules have not been validated.")
+    profile = result.get("accent_profile", {})
+    if profile.get("id") == "chinese":
+        messages.append("Chinese accent profile: Mandarin-speaking learner; target is General American English.")
+        messages.append(profile["feedback"]["note"])
+        calibrated = result.get("phoneme_results", {})
+        if calibrated.get("calibration_status") == "not_trained":
+            messages.append("SpeechOcean calibration has not been trained yet. Raw model evidence is available where supported; expert ratings are unavailable.")
+        elif calibrated.get("calibrated"):
+            messages.append("Estimated expert phone ratings use the SpeechOcean 0–2 scale. They are model estimates, not pass/fail judgments.")
+            if not calibrated.get("calibration_validation", {}).get("beats_mean_baseline_mae", False):
+                messages.append("This calibrator did not outperform the mean-rating baseline on development speakers. Treat its estimates as experimental.")
+        elif calibrated.get("calibration_status") == "unavailable":
+            messages.append("SpeechOcean calibration unavailable: " + calibrated.get("calibration_reason", "Unknown reason"))
+    messages.append("Pronunciation pass/fail unavailable: decision rules have not been validated.")
     comparison = result.get("comparison", {})
     ratio = comparison.get("duration_ratio")
     if (comparison.get("status") in {"ok", "warning"}

@@ -11,6 +11,13 @@ py -3.13 -m venv .venv
 .\.venv\Scripts\python.exe compare_audio.py data/learner.wav data/reference.wav --output runs/comparison.json
 ```
 
+To run the app
+
+```powershell
+cd "C:\Users\sarrv\Documents\Codex\2026-09-15\re\accent_coach"
+.\.venv\Scripts\python.exe app.py
+```
+
 Use two WAV recordings of **the same text**, each no longer than five seconds.
 The loader converts recordings to 16 kHz mono without trimming timestamps.
 Silence, invalid files and overlong clips return an explicit unavailable status.

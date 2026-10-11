@@ -1,3 +1,11 @@
+# New: American phoneme practice
+
+Run `python phoneme_practice.py` for the separate sentence/accent selector and
+time-aligned **experimental Correct / Incorrect / Uncertain** phoneme highlights.
+This mode needs no reference WAV. See [PHONEME_PRACTICE.md](PHONEME_PRACTICE.md)
+for targets, setup, timing, and limitations. The original `python app.py` flow
+described below remains available.
+
 # accent_coach
 TAMU Capstone 403
 

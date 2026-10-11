@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "accents": {
+    "general_american": {
+      "label": "American English",
+      "description": "Draft General American targets. Accepted reductions are listed below; model decisions remain experimental.",
+      "sentences": [
+        {
+          "id": "think",
+          "text": "I think so.",
+          "ipa": "aɪ θɪŋk soʊ",
+          "focus": "TH /θ/ in think; IH /ɪ/ as in sit, not EE /i/.",
+          "words": [
+            {"text": "I", "ipa": "aɪ", "variants": [["AY"]]},
+            {"text": "think", "ipa": "θɪŋk", "variants": [["TH", "IH", "NG", "K"]]},
+            {"text": "so", "ipa": "soʊ", "variants": [["S", "OW"]]}
+          ]
+        },
+        {
+          "id": "bed_bad",
+          "text": "The bed is bad.",
+          "ipa": "ðə bɛd ɪz bæd",
+          "focus": "EH /ɛ/ in bed versus AE /æ/ in bad; voiced TH /ð/ in the.",
+          "words": [
+            {"text": "the", "ipa": "ðə", "variants": [["DH", "AH0"], ["DH", "IY"]]},
+            {"text": "bed", "ipa": "bɛd", "variants": [["B", "EH", "D"]]},
+            {"text": "is", "ipa": "ɪz", "variants": [["IH", "Z"], ["AH0", "Z"]]},
+            {"text": "bad", "ipa": "bæd", "variants": [["B", "AE", "D"]]}
+          ]
+        },
+        {
+          "id": "ship",
+          "text": "The ship is here.",
+          "ipa": "ðə ʃɪp ɪz hɪɹ",
+          "focus": "SH /ʃ/ and IH /ɪ/ in ship, not sheep; rhotic R /ɹ/ in here.",
+          "words": [
+            {"text": "the", "ipa": "ðə", "variants": [["DH", "AH0"], ["DH", "IY"]]},
+            {"text": "ship", "ipa": "ʃɪp", "variants": [["SH", "IH", "P"]]},
+            {"text": "is", "ipa": "ɪz", "variants": [["IH", "Z"], ["AH0", "Z"]]},
+            {"text": "here", "ipa": "hɪɹ", "variants": [["HH", "IH", "R"], ["HH", "IY", "R"]]}
+          ]
+        }
+      ],
+      "variation_note": "The may use /ðə/ or emphasized /ði/; is may reduce to /əz/; here may use an /ɪ/ or /i/ vowel before /ɹ/. These are draft variants, not an exhaustive inventory of American speech. The model may not reliably recognize unreleased stops or every allophone."
+    }
+  }
+}

@@ -1,71 +1,121 @@
-# Team interface v1: week-one integration contract
+# Approved team interface contract
 
-Status: proposed implementation contract approved for repository setup by Sarrvesh; teammates should review before changing it. These interfaces are not yet implemented. Existing app callbacks and result JSON keep their current format until adapters are added.
+**Status: Approved by project lead Sarrvesh on October 12, 2026; interfaces not yet implemented.** Application baseline: `2a3352f`; shared setup: `8c4fa45`. The lead authorized team decisions and accepted the four milestone limits/policies below. `contracts/examples/*.json` now demonstrates this flat format; examples are fictional, not runtime evidence.
 
-## Scope and common base
+## 1. Scope and compatibility
 
-Starting application: commit `2a3352f`. All three new feature branches start at the same foundation commit containing this document. Initial target accent ID: `en-US-general-american`. Input modes: `preset`, `custom_text`, `free_speech`. Keep the initial recording limit at five seconds and 10 MB; unsupported words/sounds must produce explicit limitations. Custom text is the first milestone, short free speech with transcript confirmation follows. Only supported sound contrasts are assessed. Synthetic examples are required; voice-preserving conversion is a stretch goal. No percentage grade or claimed validated accuracy.
+One week: short free speech, transcript confirmation/correction, feedback on supported sounds, General American synthetic listening examples, private profiles/history, and simple personalization. Voice-preserving accent conversion is a stretch goal. No validated percentage or overall accent grade.
 
-## Service boundaries
+Keep one Python application with separate modules; a separate generation environment is optional if dependencies conflict. Use plain dictionaries at module boundaries. Do not replace existing pipeline result JSON or Gradio output tuples directly.
 
-These are language-neutral contracts, not a requirement to deploy three servers. Start with separate Python modules. Use a separate environment/service if generation dependencies conflict.
+Inspected current interfaces: `app_2.analyze_recording(path, identity, progress)` calls `analysis_service.run_attempt(path, identity, compare_reference=False, progress_callback=...)`; `pipeline.run_attempt(learner_path, prompt_id, ...)` requires a preset; `speech_content.check_content(audio, prompt, settings)` combines recognition and comparison. `attempt_history.list_attempts(prompt_id=None, limit=50)`, `read_attempt(run_id)` and `delete_attempt(run_id)` have no authenticated owner. The signatures below are proposed adapters, not existing functions.
 
-- Sessions (Lucas): `create_attempt(auth_context, input_mode, target_accent)`, `get_attempt(auth_context, attempt_id)`, `list_attempts(auth_context)`, `delete_attempt(auth_context, attempt_id)`, `get_practice_suggestions(auth_context)`.
-- Input (Sarrvesh, through Lucas's storage API): `attach_recording(auth_context, attempt_id, audio_upload)`, `confirm_text(auth_context, attempt_id, text, expected_revision)`.
-- Analysis (Sarrvesh): `transcribe(auth_context, attempt_id, input_revision)`, `analyze(auth_context, attempt_id, input_revision)`.
-- Generation (Parthiban): `generate_example(auth_context, attempt_id, input_revision)` and future `convert_accent(auth_context, attempt_id, input_revision)`.
+## 2. Session fields
 
-The server loads audio, confirmed text and accent from the authorized attempt snapshot. Do not trust a browser-supplied owner ID, raw file path, transcript or accent as an authorization boundary. Pass identifiers across components, not unrestricted disk paths. Authentication context is server-issued and never saved in the session JSON.
+All keys are present in returned session snapshots. Use null for unavailable scalar values, never fake text, zero scores or empty identifiers.
 
-## Session fields and types
-
-See `contracts/examples/session.json` for a fictional development example.
-
-| Field | Type / meaning |
+| Field | Type and meaning |
 | --- | --- |
-| schema_version | integer, initially 1 |
-| attempt_id | opaque string, unique per session |
-| user_id | opaque owner string assigned by authenticated server context |
-| created_at, updated_at | UTC ISO-8601 strings |
-| input_mode | preset / custom_text / free_speech |
-| lesson_id | string or null; never required for free speech |
-| input_revision | integer >= 1 |
-| target_accent | supported accent ID |
-| learner_audio_id | opaque asset ID or null |
-| recognized_text | string or null; preserve recognition output |
-| confirmed_text | string or null; assessment/generation require confirmation |
-| transcript_confirmed | boolean |
-| jobs | transcription, analysis, example_generation and accent_conversion job records |
-| sound_results | array; empty before assessment, not evidence of perfect pronunciation |
-| generated_assets | array; each contains audio_id, type and input_revision |
-| limitations | array of plain-language strings |
+| user_id | Nonempty opaque string, assigned from authenticated server identity; never accepted as proof of ownership from the browser. |
+| attempt_id | Nonempty server-generated opaque string identifying one practice session. |
+| input_mode | `preset`, `custom_text`, or `free_speech`; preserve preset compatibility. |
+| recognized_text | String or null. Original recognizer output for the current learner audio; never overwritten by user corrections. |
+| confirmed_text | Nonempty trimmed string or null. Text explicitly accepted by the user; typing/editing alone does not authorize analysis until submitted. |
+| target_accent | Initially only `en-US-general-american`; reject unsupported values. This is a configured target, not an inferred user identity. |
+| learner_audio_id | Opaque immutable original-audio asset ID or null before upload. No public disk path. |
+| analysis_status | null before submission, otherwise one of the five lifecycle statuses below. |
+| sound_results | Array of sound-result records, initially empty. Empty never means perfect pronunciation. |
+| generation_status | null before submission, otherwise one of the five lifecycle statuses. Independent of analysis_status. |
+| generated_audio_id | Opaque output asset ID or null. Exposed only after successful current-revision generation. |
+| generated_audio_type | null before output, then `synthetic_example` or `voice_converted`; never label ordinary TTS as converted user speech. |
+| timings | Object grouped by job (`transcription`, `analysis`, `generation`); each has measured `queue_ms`, `processing_ms`, and optional `stages_ms`. Missing measurements are omitted; all values are finite nonnegative milliseconds. |
 
-Job record: `job_id` (string or null), `input_revision` (integer), `status`, `timings_ms` (object of nonnegative numbers), `error` (null or error object). Status is `not_requested`, `queued`, `processing`, `completed`, `failed`, or `cancelled`. A completed job can return inconclusive findings. Timing values are measurements, not targets; record cold/warm conditions separately.
+Minimal supporting fields: `schema_version` (1 for this draft), `input_revision` (integer >=1), `lesson_id` (string/null), `created_at` and `updated_at` (UTC ISO-8601), `transcription_status` (same nullable lifecycle enum), `errors` (object keyed by job), and `limitations` (string array). A server-side job record additionally stores job_id, owner, kind and input_revision. This version is a proposal version, separate from existing pipeline schema_version 3.
 
-Sound result: `word`, `word_index` (zero-based), `expected_phone`, `outcome` (`supported`, `practice`, `inconclusive`), `alternative_phone` (string or null), `message`, `calibrated` (false for this release). Optional segment boundaries and diagnostic margins retain explicit units. Adapt existing `expected_supported`, `alternative_favored`, and `insufficient_evidence` to these outcomes at the boundary. Never reinterpret margins as percentages.
+For week one, keep one active generation job/output per attempt revision. If both example and conversion playback become required together, agree on an assets collection before implementing it.
 
-Asset type: `synthetic_example` or `voice_converted`. Learner audio remains a separate immutable asset. Generated assets must never become assessment input or human evaluation labels.
+## 3. Lifecycle and sound outcomes
 
-## Response envelope
+Job transitions: null -> `queued` -> `processing` -> `completed` or `failed`. Queued/processing jobs may become `cancelled`. Retry creates a new job_id. Cancelling prevents publication even if computation cannot stop immediately. Preflight rejection does not create a queued job.
 
-Successful job submission: `ok`, `attempt_id`, `input_revision`, `job_id`, `status` (normally queued). Consumers read updated session state for completion. Failure: `ok: false`, identifiers where available, and `error: {code, user_message, retryable}`. Never return stack traces, credentials or raw storage paths. Examples are in `contracts/examples/` and are development fixtures, not real findings.
+`completed` means processing produced a usable response, not correct pronunciation. `failed` means an operational error prevented that job's result (for example unavailable model or timeout). `cancelled` means intentionally abandoned or superseded work.
 
-Suggested errors: `INVALID_AUDIO`, `UNSUPPORTED_TEXT`, `CONTENT_MISMATCH`, `TRANSCRIPT_CONFIRMATION_REQUIRED`, `UNSUPPORTED_ACCENT`, `REVISION_CONFLICT`, `BUSY`, `TIMEOUT`, `MODEL_UNAVAILABLE`, `ATTEMPT_UNAVAILABLE`.
+Each sound result contains: `word` (string), `word_index` (zero-based token index in confirmed_text), `phone_index` (zero-based within the selected word pronunciation), `expected_phone` (canonical label), `outcome` (`supported`, `practice`, `inconclusive`), `alternative_phone` (label/null), `reason_code` (string/null), and `message` (plain string). Never identify a repeated word by spelling alone.
 
-## Revision and cancellation rules
+- Supported: expected sound favored over tested alternatives, subject to experimental safeguards.
+- Practice: a tested alternative was favored; not a confirmed error.
+- Inconclusive: no reliable judgment, e.g. unsupported sound, ambiguous alignment or weak evidence.
 
-1. Recording replacement, confirmed-text edit, or target-accent change increments input_revision atomically. Uploading a new recording clears recognition, confirmed text and confirmation. Text/accent edits preserve the learner audio.
-2. Invalidate sound results and generated asset links after an input change. Cancel superseded jobs where possible. Retain original recognition separately from corrected text.
-3. Workers submit results with job_id and input_revision. Storage accepts them only if both still match the active job, revision and owner, and the attempt is not deleted.
-4. Deletion marks an attempt unavailable before cancelling jobs and removing its assets. Late results cannot recreate it; cleanup temporary outputs from stale jobs. Do not bypass this with direct folder writes.
-5. Generation and analysis have independent statuses. Failure in either does not erase the other result. Whether they run simultaneously depends on resource measurements.
+Example: analysis_status=`completed` with outcome=`inconclusive`, reason_code=`UNSUPPORTED_SOUND` is valid. Model-loading failure instead produces analysis_status=`failed` and an error. If no sounds are supported, return completed with an empty array and an explicit limitation; never report success at pronunciation.
 
-## Security and recommendations
+Adapter mapping: existing `expected_supported` -> `supported`, `alternative_favored` -> `practice`, `insufficient_evidence` -> `inconclusive`. Retain diagnostic data separately; do not convert margins into percentages or map pipeline `partial` blindly to failure.
 
-Lucas owns centralized authorization; every operation including playback, download, conversion and deletion invokes it. Reject access by user B to user A's identifiers. Development mocks must never be enabled on a public deployment. Do not commit learner recordings or authentication secrets.
+## 4. Agreed Python boundaries (to implement)
 
-Recommendations may use user-selected goals, completed practice and usable target findings. Inconclusive is not a mistake; synthetic clips are not human performance. No improvement percentage without a validated measurement.
+`auth` below is a server-validated identity context, not a client-supplied dictionary. Return dictionaries using the session format or job receipt. These can be ordinary Python calls; HTTP endpoints are not required yet.
 
-## Change coordination
+```python
+# Lucas: session/storage boundary
+create_attempt(auth, *, input_mode, target_accent, lesson_id=None) -> dict
+get_attempt(auth, attempt_id) -> dict
+list_attempts(auth, *, limit=50, cursor=None) -> dict
+delete_attempt(auth, attempt_id) -> dict
+attach_recording(auth, attempt_id, upload, *, expected_revision) -> dict
+confirm_transcript(auth, attempt_id, text, *, expected_revision) -> dict
+get_practice_suggestions(auth) -> dict
 
-Each owner reviews this contract on Day 1. Changes require a small PR with an example payload update and review from affected teammates. Add fields compatibly where possible; breaking changes increment schema_version. Integration checks must cover revision changes, independent failures, authorization and deletion during processing.
+# Sarrvesh: app-facing speech jobs
+submit_transcription(auth, attempt_id, *, input_revision) -> dict
+submit_analysis(auth, attempt_id, *, input_revision) -> dict
+
+# Parthiban: app-facing audio job
+submit_generation(auth, attempt_id, *, input_revision,
+                  kind="synthetic_example") -> dict
+```
+
+Receipt: `{ok: true, attempt_id, input_revision, job_id, status: "queued"}`. Poll/read the authorized session snapshot for completion. Existing progress callbacks can update job progress internally.
+
+Trusted workers receive immutable server-resolved input snapshots. Lucas's storage layer atomically accepts results only for the matching active job_id, input_revision and owner. Internal processing may keep existing path-based functions; externally, retrieve files through authorized asset IDs. Sarrvesh adapts the preset pipeline to runtime text and separates transcription from transcript comparison. Parthiban consumes confirmed text for examples, and authorized learner audio only for true conversion. Neither worker writes around storage ownership/revision checks.
+
+## 5. Identity, ownership and audio separation
+
+Lucas establishes identity through the selected authentication mechanism. Every read, playback, download, generation, update and deletion verifies attempt ownership, including direct requests. Unauthorized/missing attempts receive a generic ATTEMPT_UNAVAILABLE response. Storage location secrecy is not authorization. Existing directory-wide runs access cannot be used unchanged for private multiuser hosting.
+
+Original learner audio and generated outputs have distinct asset roles. Analysis accepts only the learner asset. Example audio is a listening aid, never a scoring reference, substitute learner input, human label or personalization evidence. Generated files inherit their attempt's access controls and deletion policy. Recommendations may use user preferences and usable findings; inconclusive outcomes are not mistakes.
+
+## 6. Confirmation, edits and stale results
+
+Free speech: record -> independent transcription -> show editable transcript -> explicit confirmation -> analysis/generation. No automatic confirmation of recognized text. Recognition failure asks for retry/correction; it never fabricates words.
+
+Confirmation uses expected_revision to reject concurrent edits. Recording replacement, confirmed-text change or accent change increments input_revision atomically; clear current sound results, generated output links, affected statuses, errors and timings. Replacement audio also clears recognized_text and confirmed_text. Text edits retain original recognition. Accent changes may retain confirmed text. An unsent editor change disables new submission until confirmed or discarded.
+
+Cancel superseded jobs; reject late results whose revision or job_id differs. Keep older audit records separate from current results. Deletion first marks the attempt unavailable, then cancels jobs and removes assets; late workers cannot recreate it. Clean up their temporary outputs.
+
+User confirmation expresses intended text, not proof that audio contains it. Preserve recognition differences and existing quality guards. A correction must not simply force content status to match. For custom/free speech, unresolved ASR disagreement or unavailable ASR permits confirmed-text diagnostic alignment only; published sound feedback remains inconclusive. Existing preset content-alternative rules remain unchanged.
+
+## 7. Errors, missing data and limits
+
+Error envelope: `{ok: false, error: {code, user_message, retryable}}`, with attempt/revision/job identifiers when available and authorized. Keep stack traces and disk paths in internal logs. Failed jobs store this error under their job key; analysis and generation failure remain independent.
+
+Codes: INVALID_AUDIO, TRANSCRIPT_CONFIRMATION_REQUIRED, CONTENT_MISMATCH, UNSUPPORTED_TEXT, UNSUPPORTED_ACCENT, REVISION_CONFLICT, BUSY, TIMEOUT, MODEL_UNAVAILABLE, ATTEMPT_UNAVAILABLE. Unsupported individual sounds normally yield inconclusive outcomes, not a failed whole job. Unknown words require explicit handling; never silently invent reliable pronunciation evidence.
+
+Accepted milestone limits: five seconds, 10 MB, 1–12 words and at most 200 characters, enforcing both text limits. Unknown dictionary words reject analysis preflight with UNSUPPORTED_TEXT; no incorrect-sound label or automatic pronunciation generation. Initially assess TH against S/T/F, IH against IY, and AE against EH at eligible occurrences; no eligible targets yields an explicit coverage limitation. Missing learner audio blocks transcription/analysis. Missing confirmed text blocks analysis/generation. Missing generated audio disables its playback. Optional fields do not make a recording unusable. Do not upload audio to an external provider without an agreed consent/data-handling flow.
+
+## 8. Ownership and coordination
+
+| Owner | Modules/interfaces |
+| --- | --- |
+| Sarrvesh | audio_io.py, dsp_features.py, speech_content.py, analysis_service.py, assessment.py, analysis/alignment modules; transcription/analysis contracts, speed and free-speech preparation. Coordinates app_2.py and pipeline.py integration. |
+| Parthiban | New generation module, isolated generation dependencies/tests and playback component; synthetic-example contract and conversion investigation. |
+| Lucas | New auth/session-storage modules, attempt_history.py adapter, profile/history components and ownership tests; storage/auth contracts and personalization. |
+
+Coordinate changes to app_2.py, pipeline.py, site_server.py, shared CSS/JS, requirements files, settings, prompts, phoneme mappings and this contract. Schema/status/unit changes require affected teammate review. Target small PRs at team/week1-foundation; do not change another owner's interface without agreement. See FILE_OWNERSHIP.md for branch assignments.
+
+## 9. Unresolved decisions for team review
+
+- Lucas: authentication library/provider, persistent store, deployment destination and legacy local-history migration. Do not automatically assign existing recordings to a new user.
+- Sarrvesh + Lucas: exact normalization/tokenization, word indexing and MFA contraction reconciliation. The conservative ASR-disagreement policy above is accepted; a more permissive acoustic-consistency method needs evaluation.
+- Sarrvesh: implement dictionary preflight and occurrence targeting under the accepted scope. Expanding duration, contrasts or vocabulary fallbacks requires a later decision.
+- Parthiban: TTS model/provider, license, supported target voice, local versus external generation, and conversion feasibility.
+- All: processing concurrency, polling mechanism, retention/deletion requirements, and whether simultaneous example/conversion outputs are needed.
+- All: implement contract, authorization and stale-job integration tests. Contract approval and synchronized fictional examples do not establish implementation or passing integration tests.

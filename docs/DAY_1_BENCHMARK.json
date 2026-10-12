@@ -1,0 +1,259 @@
+{
+  "started_at": "2026-10-12T15:33:32.825291+00:00",
+  "python": "3.13.1",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "commit": "8c4fa455621079da003134eb67b8d23080e00475",
+  "versions": {
+    "torch": "2.14.0+cpu",
+    "transformers": "5.17.0",
+    "gradio": "6.28.0",
+    "numpy": "2.2.6",
+    "scipy": "1.15.3"
+  },
+  "scope": "Direct AnalysisService.run wall time including fresh-worker start, result saving and return. Excludes launcher imports, browser upload, UI queue/rendering. Fresh worker is not cold OS disk cache. Synthetic audio used as learner input; references disabled.",
+  "missing_measurements": [
+    "Model loading versus inference within stages",
+    "MFA lock wait versus subprocess startup versus alignment",
+    "Feedback and saving individually",
+    "Browser end-to-end latency",
+    "Server startup to readiness"
+  ],
+  "retries": 0,
+  "source_artifact": "runs/phase3-baseline-20261012T153332Z.json",
+  "cases": [
+    {
+      "lesson": "think",
+      "repeat": 1,
+      "condition": "fresh_worker",
+      "duration_sec": 1.73,
+      "audio_sha256": "6ff1f621dcddfe25685708e0194884d1f918e9e5341188d31ca254d0a3eb0a0c",
+      "wall_sec": 32.365,
+      "timings_sec": {
+        "learner_audio": 0.0137,
+        "learner_dsp": 0.0409,
+        "content_check": 9.6584,
+        "alignment": 20.112,
+        "phoneme_scoring": 1.7288,
+        "total_before_save": 31.5572
+      },
+      "overall_status": "partial",
+      "content_status": "match",
+      "alignment_status": "available",
+      "scoring_status": "uncertain",
+      "sequence_status": "available",
+      "target_statuses": [
+        "expected_supported"
+      ],
+      "reference_requested": false,
+      "full_path_completed": true
+    },
+    {
+      "lesson": "think",
+      "repeat": 2,
+      "condition": "reused_worker",
+      "duration_sec": 1.73,
+      "audio_sha256": "6ff1f621dcddfe25685708e0194884d1f918e9e5341188d31ca254d0a3eb0a0c",
+      "wall_sec": 20.8585,
+      "timings_sec": {
+        "learner_audio": 0.0009,
+        "learner_dsp": 0.014,
+        "content_check": 0.6115,
+        "alignment": 19.8479,
+        "phoneme_scoring": 0.375,
+        "total_before_save": 20.8547
+      },
+      "overall_status": "partial",
+      "content_status": "match",
+      "alignment_status": "available",
+      "scoring_status": "uncertain",
+      "sequence_status": "available",
+      "target_statuses": [
+        "expected_supported"
+      ],
+      "reference_requested": false,
+      "full_path_completed": true
+    },
+    {
+      "lesson": "think",
+      "repeat": 3,
+      "condition": "reused_worker",
+      "duration_sec": 1.73,
+      "audio_sha256": "6ff1f621dcddfe25685708e0194884d1f918e9e5341188d31ca254d0a3eb0a0c",
+      "wall_sec": 20.4674,
+      "timings_sec": {
+        "learner_audio": 0.0005,
+        "learner_dsp": 0.0128,
+        "content_check": 0.6103,
+        "alignment": 19.4796,
+        "phoneme_scoring": 0.3581,
+        "total_before_save": 20.4638
+      },
+      "overall_status": "partial",
+      "content_status": "match",
+      "alignment_status": "available",
+      "scoring_status": "uncertain",
+      "sequence_status": "available",
+      "target_statuses": [
+        "expected_supported"
+      ],
+      "reference_requested": false,
+      "full_path_completed": true
+    },
+    {
+      "lesson": "ship",
+      "repeat": 1,
+      "condition": "fresh_worker",
+      "duration_sec": 1.905,
+      "audio_sha256": "7b7298cec708233182ef9eda612b514335725521b4a2fb496891dbfae394d81a",
+      "wall_sec": 32.8095,
+      "timings_sec": {
+        "learner_audio": 0.0131,
+        "learner_dsp": 0.0455,
+        "content_check": 9.4109,
+        "alignment": 20.5688,
+        "phoneme_scoring": 1.7192,
+        "total_before_save": 31.7607
+      },
+      "overall_status": "partial",
+      "content_status": "match",
+      "alignment_status": "available",
+      "scoring_status": "uncertain",
+      "sequence_status": "available",
+      "target_statuses": [
+        "expected_supported"
+      ],
+      "reference_requested": false,
+      "full_path_completed": true
+    },
+    {
+      "lesson": "ship",
+      "repeat": 2,
+      "condition": "reused_worker",
+      "duration_sec": 1.905,
+      "audio_sha256": "7b7298cec708233182ef9eda612b514335725521b4a2fb496891dbfae394d81a",
+      "wall_sec": 21.6295,
+      "timings_sec": {
+        "learner_audio": 0.0007,
+        "learner_dsp": 0.0163,
+        "content_check": 0.8183,
+        "alignment": 20.356,
+        "phoneme_scoring": 0.4317,
+        "total_before_save": 21.6259
+      },
+      "overall_status": "partial",
+      "content_status": "match",
+      "alignment_status": "available",
+      "scoring_status": "uncertain",
+      "sequence_status": "available",
+      "target_statuses": [
+        "expected_supported"
+      ],
+      "reference_requested": false,
+      "full_path_completed": true
+    },
+    {
+      "lesson": "ship",
+      "repeat": 3,
+      "condition": "reused_worker",
+      "duration_sec": 1.905,
+      "audio_sha256": "7b7298cec708233182ef9eda612b514335725521b4a2fb496891dbfae394d81a",
+      "wall_sec": 21.3578,
+      "timings_sec": {
+        "learner_audio": 0.0006,
+        "learner_dsp": 0.0159,
+        "content_check": 0.7171,
+        "alignment": 20.2153,
+        "phoneme_scoring": 0.401,
+        "total_before_save": 21.3537
+      },
+      "overall_status": "partial",
+      "content_status": "match",
+      "alignment_status": "available",
+      "scoring_status": "uncertain",
+      "sequence_status": "available",
+      "target_statuses": [
+        "expected_supported"
+      ],
+      "reference_requested": false,
+      "full_path_completed": true
+    },
+    {
+      "lesson": "bad_bed",
+      "repeat": 1,
+      "condition": "fresh_worker",
+      "duration_sec": 2.01,
+      "audio_sha256": "7be8322e9d4cac6fef550f9e26ecc696e30e7ccfb9801095fa36947107618fa2",
+      "wall_sec": 30.9901,
+      "timings_sec": {
+        "learner_audio": 0.0175,
+        "learner_dsp": 0.0614,
+        "content_check": 9.165,
+        "alignment": 19.7503,
+        "phoneme_scoring": 0.9286,
+        "total_before_save": 29.9291
+      },
+      "overall_status": "partial",
+      "content_status": "match",
+      "alignment_status": "available",
+      "scoring_status": "uncertain",
+      "sequence_status": "available",
+      "target_statuses": [
+        "expected_supported"
+      ],
+      "reference_requested": false,
+      "full_path_completed": true
+    },
+    {
+      "lesson": "bad_bed",
+      "repeat": 2,
+      "condition": "reused_worker",
+      "duration_sec": 2.01,
+      "audio_sha256": "7be8322e9d4cac6fef550f9e26ecc696e30e7ccfb9801095fa36947107618fa2",
+      "wall_sec": 21.2201,
+      "timings_sec": {
+        "learner_audio": 0.0009,
+        "learner_dsp": 0.019,
+        "content_check": 0.6822,
+        "alignment": 20.093,
+        "phoneme_scoring": 0.4178,
+        "total_before_save": 21.2166
+      },
+      "overall_status": "partial",
+      "content_status": "match",
+      "alignment_status": "available",
+      "scoring_status": "uncertain",
+      "sequence_status": "available",
+      "target_statuses": [
+        "expected_supported"
+      ],
+      "reference_requested": false,
+      "full_path_completed": true
+    },
+    {
+      "lesson": "bad_bed",
+      "repeat": 3,
+      "condition": "reused_worker",
+      "duration_sec": 2.01,
+      "audio_sha256": "7be8322e9d4cac6fef550f9e26ecc696e30e7ccfb9801095fa36947107618fa2",
+      "wall_sec": 21.155,
+      "timings_sec": {
+        "learner_audio": 0.0006,
+        "learner_dsp": 0.0181,
+        "content_check": 0.7676,
+        "alignment": 19.9055,
+        "phoneme_scoring": 0.4552,
+        "total_before_save": 21.1505
+      },
+      "overall_status": "partial",
+      "content_status": "match",
+      "alignment_status": "available",
+      "scoring_status": "uncertain",
+      "sequence_status": "available",
+      "target_statuses": [
+        "expected_supported"
+      ],
+      "reference_requested": false,
+      "full_path_completed": true
+    }
+  ]
+}

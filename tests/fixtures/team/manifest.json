@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "synthetic_think",
+      "path": "web_assets/examples/think.wav",
+      "sha256": "6ff1f621dcddfe25685708e0194884d1f918e9e5341188d31ca254d0a3eb0a0c",
+      "synthetic": true,
+      "human_target_label": null,
+      "intended_text": "I think so",
+      "scenario": "baseline speech",
+      "purpose": "Software exercise only; not pronunciation validation"
+    },
+    {
+      "id": "synthetic_wrong_sentence",
+      "path": "web_assets/examples/ship.wav",
+      "sha256": "7b7298cec708233182ef9eda612b514335725521b4a2fb496891dbfae394d81a",
+      "synthetic": true,
+      "human_target_label": null,
+      "intended_text": "The ship is here",
+      "scenario": "choose think lesson to exercise content mismatch",
+      "purpose": "Software exercise only; not pronunciation validation"
+    },
+    {
+      "id": "synthetic_custom",
+      "path": "web_assets/examples/think_fine.wav",
+      "sha256": "4fe248f736c092fff740abf1a8ebdbb06c4bfd5b5f5d99ca5cf0027bdeb91a7a",
+      "synthetic": true,
+      "human_target_label": null,
+      "intended_text": "We think it is fine",
+      "scenario": "future custom-text route with lesson_id null",
+      "purpose": "Software exercise only; not pronunciation validation"
+    },
+    {
+      "id": "silence",
+      "path": "tests/fixtures/team/silence.wav",
+      "sha256": "20eaebffe1816e0ffa6f7f854f5ef4ea80d5349faaf0ce1fec1b713e7fde58fa",
+      "synthetic": true,
+      "human_target_label": null,
+      "intended_text": null,
+      "scenario": "unusable audio",
+      "purpose": "Software exercise only; not pronunciation validation"
+    },
+    {
+      "id": "noise",
+      "path": "tests/fixtures/team/noise.wav",
+      "sha256": "5d0d973e31ba1fc2b8c592ee9b7b34b834309642586808659cb4c658b736f7d4",
+      "synthetic": true,
+      "human_target_label": null,
+      "intended_text": null,
+      "scenario": "noise control; no positive pronunciation claim",
+      "purpose": "Software exercise only; not pronunciation validation"
+    }
+  ]
+}

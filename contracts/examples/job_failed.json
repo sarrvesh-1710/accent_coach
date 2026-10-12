@@ -1,0 +1,10 @@
+{
+  "ok": false,
+  "attempt_id": "demo-attempt-001",
+  "input_revision": 1,
+  "error": {
+    "code": "MODEL_UNAVAILABLE",
+    "user_message": "The example could not be generated. Please try again later.",
+    "retryable": true
+  }
+}

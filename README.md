@@ -1,5 +1,13 @@
 # accent_coach
 
+## Parallel team work: October 12, 2026
+
+Start with [the team contract](docs/TEAM_INTERFACE.md), [file ownership](docs/FILE_OWNERSHIP.md), and [the week-one plan](docs/WEEK_ONE_PLAN.md). These describe the next implementation, not features already shipped.
+
+Shared integration branch: `team/week1-foundation`. Feature branches: `feature/speed-free-speech` (Sarrvesh), `feature/voice-conversion` (Parthiban), and `feature/profiles-personalization` (Lucas). All initially point to the same foundation commit. Target feature PRs at the integration branch. Existing branches and `main` are preserved.
+
+[Shared fixtures](tests/fixtures/team/README.md) include synthetic software inputs, not human pronunciation validation. Verify them with `python tools/check_team_fixtures.py`. [Example payloads](contracts/examples/README.md) let each teammate develop independently.
+
 ## Website update: October 11, 2026
 
 Run `.\.venv\Scripts\python.exe app_2.py` for the current local website at `http://127.0.0.1:7861/`.

@@ -51,6 +51,10 @@ class PipelineTests(unittest.TestCase):
         self.patch.start()
         self.addCleanup(self.patch.stop)
         pipeline._REFERENCE_CACHE.clear()
+        from speech_content import compare_transcript
+        content_patch = patch("speech_content.check_content", side_effect=lambda audio, prompt, settings: compare_transcript(prompt["text"], prompt))
+        content_patch.start()
+        self.addCleanup(content_patch.stop)
         self.prompt = {"id": "test", "text": "I think so", "reference_wav": "reference.wav",
                        "target_words": ["think"], "target_phones": ["TH"], "lesson_links": []}
         (self.root / "prompts.json").write_text(json.dumps([self.prompt]), encoding="utf-8")
@@ -89,8 +93,30 @@ class PipelineTests(unittest.TestCase):
             "phoneme_scoring.align_audio": types.SimpleNamespace(align_audio=align),
             "phoneme_scoring.gop_score": types.SimpleNamespace(score_phonemes=scoring)})
 
-    def attempt(self):
-        result = pipeline.run_attempt(str(self.learner), "test")
+    def test_progress_reports_executed_stages_and_skips_sounds_on_mismatch(self):
+        updates = []
+        with self.modules():
+            pipeline.run_attempt(str(self.learner), 'test', progress_callback=updates.append)
+        recording = next(i for i, s in enumerate(updates) if s.startswith('Checking recording'))
+        words = next(i for i, s in enumerate(updates) if s.startswith('Checking words'))
+        sounds = next(i for i, s in enumerate(updates) if s.startswith('Checking sounds'))
+        self.assertLess(recording, words)
+        self.assertLess(words, sounds)
+        updates.clear()
+        with patch('speech_content.check_content', return_value={'status': 'mismatch', 'transcript': 'different sentence'}):
+            pipeline.run_attempt(str(self.learner), 'test', progress_callback=updates.append)
+        self.assertFalse(any(s.startswith('Checking sounds') for s in updates))
+
+    def test_progress_display_failure_does_not_break_analysis(self):
+        def broken(message):
+            raise RuntimeError('display disconnected')
+        with self.modules():
+            actual = pipeline.run_attempt(str(self.learner), 'test', progress_callback=broken)
+        self.assertEqual(actual['overall_status'], 'complete')
+        self.assertIsNotNone(actual['results_path'])
+
+    def attempt(self, compare_reference=True):
+        result = pipeline.run_attempt(str(self.learner), "test", compare_reference=compare_reference)
         self.assertIsNotNone(result["results_path"], result["messages"])
         saved = json.loads(Path(result["results_path"]).read_text(encoding="utf-8"))
         self.assertEqual(saved, result)
@@ -127,6 +153,25 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(result["stage_statuses"]["phoneme_scoring"]["status"], "skipped")
         self.assertIn("Alignment:", app.result_views(result)[0])
 
+    def test_sentence_mismatch_skips_forced_alignment_and_sound_judgment(self):
+        self.prompt["assessment_targets"] = [{"word": "think", "phone": "TH", "alternatives": ["S"]}]
+        (self.root / "prompts.json").write_text(json.dumps([self.prompt]))
+        with self.modules(), patch("speech_content.check_content", return_value={"status": "mismatch", "transcript": "another sentence"}):
+            result = self.attempt(compare_reference=False)
+        self.assertEqual(result["stage_statuses"]["alignment"]["status"], "skipped")
+        self.assertEqual(result["overall_status"], "partial")
+        self.assertEqual(result["target_assessment"]["targets"][0]["status"], "insufficient_evidence")
+        self.assertIsNone(result["pronunciation_grade"]["value"])
+
+    def test_asr_unavailable_retains_diagnostics_but_abstains_on_target(self):
+        self.prompt["assessment_targets"] = [{"word": "think", "phone": "TH", "alternatives": ["S"]}]
+        (self.root / "prompts.json").write_text(json.dumps([self.prompt]))
+        with self.modules(), patch("speech_content.check_content", return_value={"status": "unavailable", "reason": "missing model"}):
+            result = self.attempt(compare_reference=False)
+        self.assertEqual(result["stage_statuses"]["alignment"]["status"], "available")
+        self.assertEqual(result["target_assessment"]["targets"][0]["status"], "insufficient_evidence")
+        self.assertEqual(result["overall_status"], "partial")
+
     def test_silence_is_skipped_without_hiding_uncertain_speech(self):
         alignment = deepcopy(self.alignment)
         alignment["segments"].append({"segment_id": "quiet", "canonical_phone": "sil",
@@ -156,16 +201,33 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(result["settings"]["mfa"]["command"], command)
         self.assertEqual(result["settings"]["mfa"]["dictionary"], "english_us_arpa")
 
-    def test_missing_reference_rejected(self):
+    def test_missing_optional_reference_does_not_block(self):
         (self.root / "reference.wav").unlink()
-        result = self.attempt()
-        self.assertEqual(result["overall_status"], "failed")
-        self.assertIn("Missing reference", " ".join(result["messages"]))
-        visible_status = app.result_views(result)[0]
-        self.assertIn("Missing reference WAV", visible_status)
-        self.assertIn(str(self.root / "reference.wav"), visible_status)
-        self.assertIn(self.prompt["text"], visible_status)
-        self.assertIn("click Analyze again", visible_status)
+        with self.modules():
+            result = self.attempt()
+        self.assertEqual(result["overall_status"], "complete")
+        self.assertEqual(result["stage_statuses"]["reference_audio"]["status"], "skipped")
+        self.assertIsNone(result["audio_paths"]["reference"])
+
+    def test_reference_free_prompt_requires_only_id_and_text(self):
+        (self.root / "prompts.json").write_text(json.dumps([{"id": "test", "text": "I think so"}]), encoding="utf-8")
+        with self.modules():
+            result = self.attempt(compare_reference=False)
+        self.assertEqual(result["overall_status"], "complete")
+        for stage in ("reference_audio", "reference_dsp", "comparison"):
+            self.assertEqual(result["stage_statuses"][stage]["status"], "skipped")
+        self.assertEqual(result["spoken_words_verification"]["status"], "match")
+        self.assertIsNone(result["pronunciation_grade"]["value"])
+        self.assertFalse(any("reference" in msg.lower() for msg in result["feedback"]))
+
+    def test_corrupt_reference_never_blocks_learner_scoring(self):
+        (self.root / "reference.wav").write_bytes(b"broken")
+        with self.modules():
+            off = self.attempt(compare_reference=False)
+            on = self.attempt(compare_reference=True)
+        self.assertEqual(off["overall_status"], "complete")
+        self.assertEqual(on["overall_status"], "complete")
+        self.assertEqual(on["phoneme_results"], off["phoneme_results"])
 
     def test_silence_rejected_and_retry_has_no_stale_results(self):
         with self.modules():

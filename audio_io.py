@@ -41,8 +41,14 @@ def prepare_audio(path, settings=None):
         "trim_offset_sec": 0.0,
     }
     try:
+        if Path(path).stat().st_size > 10 * 1024 * 1024:
+            result['reason'] = 'file_too_large'
+            return result
         # Check metadata before allocating memory for potentially long input.
         with sf.SoundFile(Path(path)) as source:
+            if source.channels > 8 or source.samplerate > 192000:
+                result['reason'] = 'unsupported_audio_layout'
+                return result
             if source.format not in {"WAV", "WAVEX", "RF64"}:
                 result["reason"] = "unsupported_format"
                 return result

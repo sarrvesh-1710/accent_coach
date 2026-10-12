@@ -1,5 +1,84 @@
 # accent_coach
+
+## Website update: October 11, 2026
+
+Run `.\.venv\Scripts\python.exe app_2.py` for the current local website at `http://127.0.0.1:7861/`.
+The practice page now has a responsive layout and mobile menu, a custom favicon, and Help (`/help`),
+Privacy (`/privacy`), and Terms (`/terms`) pages. Missing page URLs return a branded HTTP 404.
+Technical results use wrapping cards, with full data still available in the results download.
+The pronunciation models and reference-free assessment rules are unchanged by this frontend update.
+
+Shared styling and icons live in `web_assets/`. `site_pages.py` provides common navigation,
+metadata, and page content; `site_server.py` mounts the existing Gradio app in a local FastAPI server.
+`site_config.json` contains the team name and contact email. The phone and public URL are deliberately
+unset because no phone number or domain is being used. Assets use system fonts, a compact SVG logo,
+an ICO favicon, and compressed HTTP responses. Optional builder footer links are disabled.
+
+Run `python tools/check_site_readiness.py` to see the remaining public-launch requirements.
+The website remains localhost-only and requests no search-engine indexing. A domain, verified hosting,
+reviewed hosted-service policies, and isolated user storage are still required before public launch.
+See `docs/FRONTEND_REPORT_2026-10-11.md` for the verification results and known limits.
 TAMU Capstone 403
+
+## October 11 release preparation
+
+- **12 preset lessons**, all defined in `prompts.json`: sentences, targets, alternatives, written sound hints, and practice actions. No UI edits or reference recordings are needed to add a configured lesson.
+- **Local attempt history** with replay and explicitly confirmed deletion. History is for the person using this laptop, not an authenticated multi-user service.
+- **Bounded processing**: one reusable offline worker, a three-minute attempt deadline, a two-minute MFA timeout, eight waiting UI requests, and a 10 MB upload cap. A failed worker is replaced for the next attempt.
+- **Evaluation and diagnostics**: saved stage times and recognized-word differences; speaker-split checks and reviewer-based counts including abstentions and coverage.
+- **Setup and reproducibility**: `tools/check_installation.py`, `tools/release_snapshot.py`, the [demo runbook](docs/DEMO_RUNBOOK.md), and the [human validation protocol](docs/VALIDATION_PROTOCOL.md).
+
+Model assessment remains experimental. Expanded lesson configuration and synthetic smoke checks do not establish human pronunciation accuracy. Public hosting and validated grading are not part of this local release.
+
+## Current demo: reference-free target-sound assessment (October 10)
+
+Run `.\.venv\Scripts\python.exe app_2.py` and open http://127.0.0.1:7861/.
+No reference recording is loaded or compared by this screen.
+
+The beginner screen now shows **Recognized words**, simpler experimental sound feedback,
+result playback, and **Record again**. **Practice** buttons open written hints;
+teal marks the lesson focus rather than a score. Processing messages follow the
+actual pipeline stages without estimated percentages. See
+`docs/UI_UPDATE_REPORT_2026-10-10.md` for verification and the manual checklist.
+
+- **Whisper base.en** independently transcribes the recording, without the selected sentence as a hint.
+- **MFA** aligns supplied text only when the recognized content is compatible. A clear disagreement asks for another recording; it is not a pronunciation failure.
+- **wav2vec2** supplies phoneme probabilities. A new log-space CTC forward calculation compares the complete expected phone sequence with target-substitution alternatives, summing all valid paths including blank frames.
+- Target assessments cover **TH in think**, **IH in ship**, and **AE in bad**, now across twelve short sentences. The main result describes a sound closer to expected, suggests practice for a possible alternative, or says the app is unsure. These are experimental model-evidence categories, not validated grades.
+- No reference duration, reference pitch, numeric pronunciation percentage, or whole-sentence grade is used. Legacy frame-level margins remain in Engineering details.
+
+### Setup and tests
+
+The existing `requirements-scoring.txt` packages suffice. Download the pinned ASR
+weights once (already completed on this laptop):
+
+```powershell
+.\.venv\Scripts\python.exe tools/setup_content_model.py
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+.\.venv\Scripts\python.exe phoneme_scoring/gop_score.py --self-test
+.\.venv\Scripts\python.exe tools/check_assessment.py
+```
+
+The setup command downloads public model files; it does not upload recordings.
+The runtime uses local cached weights. MFA and the phoneme model still require
+the setup below. Results schema 3 includes `spoken_words_verification`,
+`phoneme_results.sequence_evidence`, and `target_assessment`. `pronunciation_grade`
+remains null/unvalidated.
+
+The experimental sequence margin is `log P(expected sequence|audio) - log P(best
+configured substitution sequence|audio)`. The default ±1 nat decision boundary
+is an abstention heuristic, not a calibrated accuracy threshold. Missing sentence
+verification, clipping, unsupported target context, weak local sound evidence,
+or a close comparison prevent positive/negative sound feedback. Accepted lexical
+contrast variants (e.g. ship/sheep) allow diagnostic assessment; they do not count
+as matching the exact words or as correct pronunciation. Dictionary variants
+selected by MFA condition the baseline sequence. The method does not assess
+insertions, deletions, all possible alternatives, rhythm, stress, or accent identity.
+
+Use the existing human evaluation manifest and `tools/evaluate_recordings.py --run`
+to collect both legacy frame margins and new guarded sequence assessments. **Human
+labels and held-out evaluation are still required before any correctness grade.**
+
 
 ## Parthiban: local application and feedback
 
@@ -18,16 +97,15 @@ saves `runs/<run_id>/results.json`; accepted learner audio is copied into that
 run folder for playback. Delete a run folder to remove its retained recording
 and results. These files stay local and are excluded from Git.
 
-Supply permitted or consenting team reference recordings at:
+Optional listening examples can be supplied, with speaker permission, at:
 
 - `data/references/think.wav` saying **I think so**
 - `data/references/ship.wav` saying **The ship is here**
 - `data/references/bad_bed.wav` saying **That is a bad bed**
 
-These assets are intentionally not fabricated or bundled. A missing reference
-is rejected. A team recording is not automatically a validated General American
-target. The learner must read the selected text; this application does not verify
-the transcript with speech recognition.
+These assets are intentionally not fabricated or bundled. Missing or corrupt examples do not block learner analysis. Reference comparison is off by default. A team recording is not automatically a validated General American
+target. The learner must read the selected text. The current pipeline checks
+recognized words with Whisper before alignment; recognition can still mishear speech.
 
 Lucas's `settings.json`, `align_audio.py`, `gop_score.py`, and `phoneme_map.json`
 belong in `phoneme_scoring/`. The pipeline imports that package and resolves
@@ -62,15 +140,15 @@ other fields. For example (replace the Conda executable path):
   "mfa": {
     "command": ["C:/path/to/conda.exe", "run", "--no-capture-output", "-n", "accent-coach-mfa", "mfa"]
   },
-  "model": {"cache_dir": "../models/huggingface", "local_files_only": false}
+  "model": {"cache_dir": "../models/huggingface", "local_files_only": true}
 }
 ```
 
 The app runs MFA through Conda so its native dependencies are available while
-the UI stays in `.venv`. No global PATH change is needed. The first analysis
-downloads the pretrained Wav2Vec2 checkpoint (about 1.3 GB). After it has loaded
-successfully, set `local_files_only` to `true` to reuse the cached checkpoint
-offline. The shared configuration pins the exact model revision. The tested
+the UI stays in `.venv`. No global PATH change is needed. Run
+`tools/setup_models.py` explicitly to download both pinned model checkpoints before
+opening the app. Inference uses the cached checkpoints offline; first-use downloads
+are disabled in the beginner worker. The shared configuration pins the exact model revision. The tested
 Gradio version needs Transformers 5 and a compatible Hugging Face Hub version;
 use the pinned scoring requirements rather than the older Transformers 4 setup.
 Restart the app after installing packages or changing Python files.
@@ -211,3 +289,93 @@ Run both automated test suites from the repository folder:
 
 These check software behavior, including low/high steady pitches and evidence
 gating. They are not a measured pronunciation accuracy score.
+
+## Beginner practice interface (`app_2.py`)
+
+From the repository folder, run:
+
+```powershell
+.\.venv\Scripts\python.exe app_2.py
+```
+
+Open http://127.0.0.1:7861. The original `app.py` remains available separately.
+This screen uses the same prompts, settings, and analysis pipeline, with no reference audio controls.
+No additional packages are needed beyond the existing team environment.
+
+1. **Read:** choose a sentence and review the practice sound hints.
+2. **Your turn:** record with the microphone (browser permission required) or
+   upload audio, then press **Check my recording**. Keep the recording at most
+   five seconds long.
+3. **Practice again:** review the experimental target-sound feedback and your recording, and press **Try again** to clear the recording and previous results.
+
+The main view uses simple English and actionable recording messages. It does
+not translate instructions or assign a pronunciation grade. Reference-comparison graphs are absent from the new interface. Diagnostic model margins, processing status, warnings,
+and downloadable JSON remain in the collapsed **Engineering data & processing details** section. English lesson links have a separate
+collapsed section. Changing the sentence or recording clears stale results.
+The server is local to this computer; accepted attempts are saved under `runs/`.
+
+Quick manual check: select each sentence; upload
+a recording, run the check, and inspect Technical details. Choose Try again and
+confirm the recording/results clear. Change sentences and confirm the Check button stays disabled until a new recording is supplied.
+Automated interface behavior is covered by `tests/test_app_2.py` in the test suite
+above. Microphone capture needs a manual check on a browser with a microphone.
+
+### Lesson hints and assessment
+
+Clickable hints describe expected sounds for practice; teal marks lesson focus,
+not correctness. The assessment card describes model evidence for the configured
+target sound only. Recording and result changes clear prior evidence.
+
+## Historical milestone (October 7, 2026; superseded by the update above)
+
+The required path is **prompt text + learner WAV → learner DSP → MFA alignment →
+pretrained phoneme evidence → practice feedback**. No reference WAV is loaded by
+this analysis unless explicitly requested. The sentence is supplied to MFA;
+forced alignment is not independent recognition of the spoken words.
+
+`run_attempt(path, prompt_id)` defaults to learner-only analysis. Use
+`run_attempt(path, prompt_id, compare_reference=True)` for the optional legacy
+acoustic comparison. A missing/broken example cannot stop phoneme inference.
+Results schema 2 records `reference_comparison_requested`, `pronunciation_grade`
+(null, not validated), and `spoken_words_verification` (not implemented).
+MFA word intervals and phone-to-word associations are retained when available.
+The pretrained model, pinned model revision, and evidence gates are unchanged.
+
+From the repository folder:
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+.\.venv\Scripts\python.exe phoneme_scoring/gop_score.py --self-test
+.\.venv\Scripts\python.exe tools/check_reference_free.py
+```
+
+The last command runs the real MFA/model on the three local examples **as learner
+inputs**, with every reference path removed in memory. It does not delete files
+or measure pronunciation accuracy. It writes `runs/reference_free_smoke.json`.
+
+### Human evaluation deliverable
+
+```powershell
+.\.venv\Scripts\python.exe tools/evaluate_recordings.py --init
+.\.venv\Scripts\python.exe tools/evaluate_recordings.py
+.\.venv\Scripts\python.exe tools/evaluate_recordings.py --run
+```
+
+Initialize once (`--init` refuses to overwrite). Fill
+`data/evaluation/manifest.json` with consented WAV paths and listener labels.
+The plan has 3 speakers × 3 prompts × 2 takes × 2 conditions = 36 recordings.
+Reserve speaker S03's 12 clips before tuning. Requested altered pronunciations
+are recording instructions, **not human labels**. Use an independent listener
+and mark unclear cases. `--run` saves results and target-word/phone evidence in
+`runs/team_evaluation.json`; it does not turn margins into pass/fail or accuracy.
+The manifest and recordings stay local under ignored `data/`.
+
+Tokenizer/dictionary coverage audit (use your installed dictionary path):
+
+```powershell
+.\.venv\Scripts\python.exe tools/audit_pronunciations.py --dictionary "C:/path/to/english_us_arpa.dict"
+```
+
+This offline audit checks labels and word coverage, not whether the model judges
+pronunciation correctly. Human review of dictionary variants and phone mappings,
+held-out evaluation, wrong-sentence detection, and validated grading remain open.

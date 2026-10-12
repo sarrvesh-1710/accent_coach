@@ -15,17 +15,19 @@ import math
 from pathlib import Path
 import shutil
 import threading
+import time
 import uuid
 
 from feedback import make_feedback
+from assessment import summarize_assessment
 from phoneme_scoring.align_audio import load_settings
 
 BASE_DIR = Path(__file__).resolve().parent
 _LOCK = threading.Lock()
 _REFERENCE_CACHE = OrderedDict()
-_STAGES = ("configuration", "learner_audio", "reference_audio", "learner_dsp",
-           "reference_dsp", "comparison", "alignment", "phoneme_scoring", "feedback", "save")
-_USABLE = {"ok", "warning", "scored", "available"}
+_STAGES = ("configuration", "learner_audio", "content_check", "reference_audio", "learner_dsp",
+           "reference_dsp", "comparison", "alignment", "phoneme_scoring", "target_assessment", "feedback", "save")
+_USABLE = {"ok", "warning", "scored", "available", "match", "target_variant"}
 
 
 def json_safe(value):
@@ -46,21 +48,8 @@ def json_safe(value):
 
 
 def load_prompts():
-    entries = json.loads((BASE_DIR / "prompts.json").read_text(encoding="utf-8"))
-    if not isinstance(entries, list) or not entries:
-        raise ValueError("prompts.json must contain a nonempty list.")
-    ids = set()
-    for entry in entries:
-        for key in ("id", "text", "reference_wav"):
-            if not isinstance(entry.get(key), str) or not entry[key].strip():
-                raise ValueError(f"Every prompt needs a nonempty {key}.")
-        if entry["id"] in ids:
-            raise ValueError("Prompt IDs must be unique.")
-        ids.add(entry["id"])
-        for key in ("target_words", "target_phones", "lesson_links"):
-            if not isinstance(entry.get(key), list):
-                raise ValueError(f"Prompt {entry['id']} needs a {key} list.")
-    return entries
+    from lesson_catalog import load_lessons
+    return load_lessons(BASE_DIR / "prompts.json")
 
 
 def _path(path):
@@ -123,6 +112,7 @@ def _validate_scores(output, alignment):
 
 
 def _stage(result, name, module, function, *args, validator=None):
+    started = time.monotonic()
     try:
         output = getattr(importlib.import_module(module), function)(*args)
         if not isinstance(output, dict) or not isinstance(output.get("status"), str):
@@ -144,53 +134,23 @@ def _stage(result, name, module, function, *args, validator=None):
         result["stage_statuses"][name] = {"status": "unavailable", "message": message}
         result["messages"].append(f"{name}: {message}")
         return {"status": "unavailable", "reason": message}
+    finally:
+        result.setdefault('timings_sec', {})[name] = round(time.monotonic() - started, 4)
 
 
 def _usable(output):
     return output.get("status") in _USABLE
 
 
-def _analyze(result, learner_path, prompt_id, run_dir):
-    prompts = load_prompts()
-    prompt = next((p for p in prompts if p["id"] == prompt_id), None)
-    if prompt is None:
-        raise ValueError("Choose one of the available prompts.")
-    result["prompt"] = prompt
-    settings_path = BASE_DIR / "phoneme_scoring" / "settings.json"
-    settings = load_settings(settings_path) if settings_path.exists() else {}
-    if not isinstance(settings, dict):
-        raise ValueError("settings.json must contain an object.")
-    settings["_settings_dir"] = str(settings_path.parent.resolve())
-    settings = {"sample_rate_hz": 16000, "max_duration_sec": 5, "device": "cpu", **settings}
-    if settings["sample_rate_hz"] != 16000 or settings["device"] != "cpu":
-        raise ValueError("This milestone requires 16000 Hz audio and device='cpu'.")
-    limit = settings["max_duration_sec"]
-    if not _number(limit) or not 0 < limit <= 5:
-        raise ValueError("max_duration_sec must be positive and at most 5.")
-    result["stage_statuses"]["configuration"] = {"status": "ok", "message": None}
-    if not settings_path.exists():
-        result["messages"].append("phoneme_scoring/settings.json is missing; using documented CPU audio/DSP defaults. Add Lucas's settings for alignment and scoring.")
-        result["stage_statuses"]["configuration"]["status"] = "warning"
-    result["settings"] = settings
-    reference = _path(prompt["reference_wav"])
-    if not reference.is_file():
-        result["stage_statuses"]["reference_audio"] = {"status": "unavailable", "message": f"Missing reference WAV: {reference}"}
-        raise ValueError(f"Missing reference WAV: {reference}. Record exactly: {prompt['text']}")
-    if not learner_path:
-        raise ValueError("Upload a learner WAV before analyzing.")
-    learner = Path(learner_path).resolve()
-    if not learner.is_file() or learner.suffix.lower() != ".wav":
-        raise ValueError("Upload an existing .wav file.")
-    learner_audio = _stage(result, "learner_audio", "audio_io", "prepare_audio", str(learner), settings)
-    result["learner_audio"] = json_safe(learner_audio)
-    if not _usable(learner_audio):
+def _optional_reference(result, prompt, learner_audio, settings, prompt_id):
+    """Optional diagnostics cannot gate learner analysis or evidence status."""
+    reference_name = prompt.get("reference_wav")
+    reference = _path(reference_name) if reference_name else None
+    for stage in ("reference_audio", "reference_dsp", "comparison"):
+        result["stage_statuses"][stage] = {"status": "skipped", "message": "Optional reference unavailable."}
+    if reference is None or not reference.is_file():
+        result["stage_statuses"]["reference_audio"] = {"status": "skipped", "message": "No optional example file. Learner analysis continues."}
         return
-    # Retain a stable copy: Gradio's temporary upload may disappear after a session.
-    saved_audio = run_dir / "learner.wav"
-    shutil.copyfile(learner, saved_audio)
-    result["audio_paths"]["original"] = str(saved_audio)
-    learner_audio["prompt_id"] = prompt_id
-    result["learner_audio"]["path"] = str(saved_audio)
     stat = reference.stat()
     cache_key = (str(reference), stat.st_mtime_ns, stat.st_size, json.dumps(settings, sort_keys=True))
     cached = _REFERENCE_CACHE.get(cache_key)
@@ -215,42 +175,127 @@ def _analyze(result, learner_path, prompt_id, run_dir):
     reference_audio["prompt_id"] = prompt_id
     result["audio_paths"]["reference"] = str(reference)
     result["reference_dsp"] = reference_dsp
+    if _usable(reference_dsp):
+        result["comparison"] = _stage(result, "comparison", "compare_audio", "compare_audio", learner_audio,
+                                       reference_audio, result["learner_dsp"], reference_dsp, settings)
+
+
+def _report_progress(callback, message):
+    """Display-only notifications must never change analysis or saved results."""
+    if callback is not None:
+        try:
+            callback(message)
+        except Exception:
+            pass
+
+
+def _analyze(result, learner_path, prompt_id, run_dir, compare_reference=False, progress_callback=None):
+    _report_progress(progress_callback, "Checking recording - preparing your audio")
+    prompts = load_prompts()
+    prompt = next((p for p in prompts if p["id"] == prompt_id), None)
+    if prompt is None:
+        raise ValueError("Choose one of the available prompts.")
+    result["prompt"] = prompt
+    settings_path = BASE_DIR / "phoneme_scoring" / "settings.json"
+    settings = load_settings(settings_path) if settings_path.exists() else {}
+    if not isinstance(settings, dict):
+        raise ValueError("settings.json must contain an object.")
+    settings["_settings_dir"] = str(settings_path.parent.resolve())
+    settings = {"sample_rate_hz": 16000, "max_duration_sec": 5, "device": "cpu", **settings}
+    if settings["sample_rate_hz"] != 16000 or settings["device"] != "cpu":
+        raise ValueError("This milestone requires 16000 Hz audio and device='cpu'.")
+    limit = settings["max_duration_sec"]
+    if not _number(limit) or not 0 < limit <= 5:
+        raise ValueError("max_duration_sec must be positive and at most 5.")
+    result["stage_statuses"]["configuration"] = {"status": "ok", "message": None}
+    if not settings_path.exists():
+        result["messages"].append("phoneme_scoring/settings.json is missing; using documented CPU audio/DSP defaults. Add Lucas's settings for alignment and scoring.")
+        result["stage_statuses"]["configuration"]["status"] = "warning"
+    result["settings"] = settings
+    if not isinstance(compare_reference, bool):
+        raise ValueError("compare_reference must be true or false.")
+    result["reference_comparison_requested"] = compare_reference
+    settings["_assessment_targets"] = prompt.get("assessment_targets", [])
+    result["pronunciation_grade"] = {"status": "not_validated", "value": None}
+    for stage in ("reference_audio", "reference_dsp", "comparison"):
+        result["stage_statuses"][stage] = {"status": "skipped", "message": "Optional reference comparison not requested."}
+    if not learner_path:
+        raise ValueError("Upload a learner WAV before analyzing.")
+    learner = Path(learner_path).resolve()
+    if not learner.is_file() or learner.suffix.lower() != ".wav":
+        raise ValueError("Upload an existing .wav file.")
+    learner_audio = _stage(result, "learner_audio", "audio_io", "prepare_audio", str(learner), settings)
+    result["learner_audio"] = json_safe(learner_audio)
+    if not _usable(learner_audio):
+        return
+    # Retain a stable copy: Gradio's temporary upload may disappear after a session.
+    saved_audio = run_dir / "learner.wav"
+    shutil.copyfile(learner, saved_audio)
+    result["audio_paths"]["original"] = str(saved_audio)
+    learner_audio["prompt_id"] = prompt_id
+    result["learner_audio"]["path"] = str(saved_audio)
     result["learner_dsp"] = _stage(result, "learner_dsp", "dsp_features", "extract_features", learner_audio, settings)
-    result["comparison"] = _stage(result, "comparison", "compare_audio", "compare_audio", learner_audio,
-                                   reference_audio, result["learner_dsp"], reference_dsp, settings)
+    _report_progress(progress_callback, "Checking words - listening to your sentence")
+    result["spoken_words_verification"] = _stage(result, "content_check", "speech_content", "check_content",
+                                                 str(saved_audio), prompt, settings)
+    if result["spoken_words_verification"]["status"] == "mismatch":
+        # Avoid forcing a known-disagreeing transcript into a misleading alignment.
+        result["overall_status"] = "partial"
+        return
+    if compare_reference:
+        try:
+            _optional_reference(result, prompt, learner_audio, settings, prompt_id)
+        except Exception as exc:
+            result["stage_statuses"]["reference_audio"] = {"status": "unavailable", "message": str(exc)}
+            result["messages"].append(f"Optional example comparison unavailable: {exc}")
+    _report_progress(progress_callback, "Checking sounds - locating sounds in your sentence; this may take a minute")
     result["alignment"] = _stage(result, "alignment", "phoneme_scoring.align_audio", "align_audio", str(saved_audio),
                                   prompt["text"], settings, str(run_dir),
                                   validator=lambda x: _validate_alignment(x, learner_audio["duration_sec"]))
     if _usable(result["alignment"]):
+        _report_progress(progress_callback, "Checking sounds - comparing the practice sound")
         result["phoneme_results"] = _stage(result, "phoneme_scoring", "phoneme_scoring.gop_score", "score_phonemes",
             str(saved_audio), result["alignment"], settings,
             validator=lambda x: _validate_scores(x, result["alignment"]))
     statuses = result["stage_statuses"]
-    required = ("learner_dsp", "reference_dsp", "comparison", "alignment", "phoneme_scoring")
+    required = ("learner_dsp", "alignment", "phoneme_scoring")
     if all(statuses[s]["status"] in _USABLE for s in required):
         result["overall_status"] = "complete"
     elif any(_usable(result.get(s, {})) for s in ("learner_dsp", "comparison", "phoneme_results")):
         result["overall_status"] = "partial"
 
 
-def run_attempt(learner_path, prompt_id) -> dict:
+def run_attempt(learner_path, prompt_id, *, compare_reference=False, progress_callback=None) -> dict:
     """Analyze one attempt; always return a fresh result and try to save its JSON."""
+    _report_progress(progress_callback, "Waiting for the recording check to start")
     with _LOCK:  # Also protects reference cache and model calls across UI sessions.
+        attempt_started = time.monotonic()
         run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S") + "_" + uuid.uuid4().hex[:12]
         run_dir = BASE_DIR / "runs" / run_id
-        result = {"run_id": run_id, "prompt_id": prompt_id, "overall_status": "failed",
+        result = {"schema_version": 3, "run_id": run_id, "prompt_id": prompt_id, "overall_status": "failed",
                   "stage_statuses": {s: {"status": "skipped", "message": "Prerequisite unavailable."} for s in _STAGES},
                   "audio_paths": {"original": None, "reference": None}, "learner_dsp": {},
                   "reference_dsp": {}, "comparison": {}, "alignment": {},
                   "phoneme_results": {"status": "unavailable", "segments": []},
+                  "spoken_words_verification": {"status": "unavailable", "reason": "Not run."},
+                  "pronunciation_grade": {"status": "not_validated", "value": None},
                   "messages": [], "feedback": [], "results_path": None}
         try:
             run_dir.mkdir(parents=True, exist_ok=False)
-            _analyze(result, learner_path, prompt_id, run_dir)
+            _analyze(result, learner_path, prompt_id, run_dir, compare_reference, progress_callback)
         except Exception as exc:
             result["messages"].append(str(exc))
             if result["stage_statuses"]["configuration"]["status"] == "skipped":
                 result["stage_statuses"]["configuration"] = {"status": "unavailable", "message": str(exc)}
+        _report_progress(progress_callback, "Preparing your feedback")
+        result["target_assessment"] = summarize_assessment(result)
+        result["stage_statuses"]["target_assessment"] = {
+            "status": result["target_assessment"]["status"], "message": result["target_assessment"].get("reason")}
+        if result.get("prompt", {}).get("assessment_targets") and (
+            result["target_assessment"]["status"] != "available" or
+            any(r["status"] == "insufficient_evidence" for r in result["target_assessment"]["targets"])
+        ) and result["overall_status"] == "complete":
+            result["overall_status"] = "partial"
         try:
             result["feedback"] = make_feedback(result, result.get("prompt", {}))
             result["stage_statuses"]["feedback"] = {"status": "ok", "message": None}
@@ -263,6 +308,7 @@ def run_attempt(learner_path, prompt_id) -> dict:
             destination = run_dir / "results.json"
             result["results_path"] = str(destination)
             result["stage_statuses"]["save"] = {"status": "ok", "message": None}
+            result.setdefault('timings_sec', {})['total_before_save'] = round(time.monotonic() - attempt_started, 4)
             result = json_safe(result)
             temporary = run_dir / "results.tmp"
             temporary.write_text(json.dumps(result, indent=2, ensure_ascii=False, allow_nan=False) + "\n", encoding="utf-8")

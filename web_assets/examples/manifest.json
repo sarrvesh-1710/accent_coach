@@ -1,0 +1,110 @@
+[
+  {
+    "id": "think",
+    "language": "en-US",
+    "used_for_scoring": false,
+    "synthetic": true,
+    "text": "I think so",
+    "voice": "Microsoft Zira Desktop",
+    "file": "think.wav"
+  },
+  {
+    "id": "ship",
+    "language": "en-US",
+    "used_for_scoring": false,
+    "synthetic": true,
+    "text": "The ship is here",
+    "voice": "Microsoft Zira Desktop",
+    "file": "ship.wav"
+  },
+  {
+    "id": "bad_bed",
+    "language": "en-US",
+    "used_for_scoring": false,
+    "synthetic": true,
+    "text": "That is a bad bed",
+    "voice": "Microsoft Zira Desktop",
+    "file": "bad_bed.wav"
+  },
+  {
+    "id": "think_can",
+    "language": "en-US",
+    "used_for_scoring": false,
+    "synthetic": true,
+    "text": "I think we can",
+    "voice": "Microsoft Zira Desktop",
+    "file": "think_can.wav"
+  },
+  {
+    "id": "think_again",
+    "language": "en-US",
+    "used_for_scoring": false,
+    "synthetic": true,
+    "text": "Please think again",
+    "voice": "Microsoft Zira Desktop",
+    "file": "think_again.wav"
+  },
+  {
+    "id": "think_fine",
+    "language": "en-US",
+    "used_for_scoring": false,
+    "synthetic": true,
+    "text": "We think it is fine",
+    "voice": "Microsoft Zira Desktop",
+    "file": "think_fine.wav"
+  },
+  {
+    "id": "ship_see",
+    "language": "en-US",
+    "used_for_scoring": false,
+    "synthetic": true,
+    "text": "I see a ship",
+    "voice": "Microsoft Zira Desktop",
+    "file": "ship_see.wav"
+  },
+  {
+    "id": "ship_big",
+    "language": "en-US",
+    "used_for_scoring": false,
+    "synthetic": true,
+    "text": "This ship is big",
+    "voice": "Microsoft Zira Desktop",
+    "file": "ship_big.wav"
+  },
+  {
+    "id": "ship_coming",
+    "language": "en-US",
+    "used_for_scoring": false,
+    "synthetic": true,
+    "text": "A ship is coming",
+    "voice": "Microsoft Zira Desktop",
+    "file": "ship_coming.wav"
+  },
+  {
+    "id": "bad_idea",
+    "language": "en-US",
+    "used_for_scoring": false,
+    "synthetic": true,
+    "text": "That was a bad idea",
+    "voice": "Microsoft Zira Desktop",
+    "file": "bad_idea.wav"
+  },
+  {
+    "id": "bad_day",
+    "language": "en-US",
+    "used_for_scoring": false,
+    "synthetic": true,
+    "text": "It is a bad day",
+    "voice": "Microsoft Zira Desktop",
+    "file": "bad_day.wav"
+  },
+  {
+    "id": "bad_plan",
+    "language": "en-US",
+    "used_for_scoring": false,
+    "synthetic": true,
+    "text": "This is a bad plan",
+    "voice": "Microsoft Zira Desktop",
+    "file": "bad_plan.wav"
+  }
+]

@@ -3,24 +3,845 @@
     "id": "think",
     "text": "I think so",
     "reference_wav": "data/references/think.wav",
-    "target_words": ["think"],
-    "target_phones": ["TH"],
-    "lesson_links": [{"title": "Learn this sound: TH consonants", "url": "https://rachelsenglish.com/english-pronounce-th-consonants/"}]
+    "target_words": [
+      "think"
+    ],
+    "target_phones": [
+      "TH"
+    ],
+    "lesson_links": [
+      {
+        "title": "Learn this sound: TH consonants",
+        "url": "https://rachelsenglish.com/english-pronounce-th-consonants/"
+      }
+    ],
+    "assessment_targets": [
+      {
+        "word": "think",
+        "phone": "TH",
+        "alternatives": [
+          "S",
+          "T",
+          "F"
+        ]
+      }
+    ],
+    "content_alternatives": {
+      "think": [
+        "sink",
+        "tink",
+        "fink"
+      ]
+    },
+    "practice_tip": "Practice “think”: let air flow gently with your tongue tip lightly between your teeth.",
+    "practice_words": [
+      {
+        "word": "I",
+        "sounds": [
+          {
+            "phone": "AY",
+            "label": "eye",
+            "hint": "Glide through the vowel in ‘eye’."
+          }
+        ]
+      },
+      {
+        "word": "think",
+        "sounds": [
+          {
+            "phone": "TH",
+            "label": "th · think",
+            "hint": "Let air flow gently with your tongue tip lightly between your teeth."
+          },
+          {
+            "phone": "IH",
+            "label": "i · ship",
+            "hint": "Practice ‘ship’ and ‘sheep’; listen for different vowel sounds."
+          },
+          {
+            "phone": "NG",
+            "label": "ng · sing",
+            "hint": "Use the final sound of ‘sing’; let your voice hum through your nose."
+          },
+          {
+            "phone": "K",
+            "label": "k",
+            "hint": "Briefly stop air at the back of your mouth, then release it."
+          }
+        ]
+      },
+      {
+        "word": "so",
+        "sounds": [
+          {
+            "phone": "S",
+            "label": "s",
+            "hint": "Let air flow in a soft hiss."
+          },
+          {
+            "phone": "OW",
+            "label": "oh",
+            "hint": "Glide through the vowel in ‘so’."
+          }
+        ]
+      }
+    ],
+    "validation_status": "experimental_unvalidated",
+    "practice_ipa": "aɪ θɪŋk soʊ"
   },
   {
     "id": "ship",
     "text": "The ship is here",
     "reference_wav": "data/references/ship.wav",
-    "target_words": ["ship"],
-    "target_phones": ["IH", "IY"],
-    "lesson_links": [{"title": "Learn this sound: IH and the IH/EE contrast", "url": "https://rachelsenglish.com/english-pronounce-ih-vowel/"}]
+    "target_words": [
+      "ship"
+    ],
+    "target_phones": [
+      "IH",
+      "IY"
+    ],
+    "lesson_links": [
+      {
+        "title": "Learn this sound: IH and the IH/EE contrast",
+        "url": "https://rachelsenglish.com/english-pronounce-ih-vowel/"
+      }
+    ],
+    "assessment_targets": [
+      {
+        "word": "ship",
+        "phone": "IH",
+        "alternatives": [
+          "IY"
+        ]
+      }
+    ],
+    "content_alternatives": {
+      "ship": [
+        "sheep"
+      ]
+    },
+    "practice_tip": "Practice “ship” and “sheep”: say each word slowly and listen for the different vowel sounds.",
+    "practice_words": [
+      {
+        "word": "The",
+        "sounds": [
+          {
+            "phone": "DH",
+            "label": "th · this",
+            "hint": "Use the tongue position of ‘th’, with your voice switched on."
+          },
+          {
+            "phone": "AH",
+            "label": "uh",
+            "hint": "Keep this unstressed vowel relaxed and short."
+          }
+        ]
+      },
+      {
+        "word": "ship",
+        "sounds": [
+          {
+            "phone": "SH",
+            "label": "sh",
+            "hint": "Round your lips slightly and make a soft ‘sh’."
+          },
+          {
+            "phone": "IH",
+            "label": "i · ship",
+            "hint": "Practice ‘ship’ and ‘sheep’; listen for different vowel sounds."
+          },
+          {
+            "phone": "P",
+            "label": "p",
+            "hint": "Close your lips, then release a small puff of air."
+          }
+        ]
+      },
+      {
+        "word": "is",
+        "sounds": [
+          {
+            "phone": "IH",
+            "label": "i · ship",
+            "hint": "Practice ‘ship’ and ‘sheep’; listen for different vowel sounds."
+          },
+          {
+            "phone": "Z",
+            "label": "z",
+            "hint": "Make an ‘s’ shape and add your voice."
+          }
+        ]
+      },
+      {
+        "word": "here",
+        "sounds": [
+          {
+            "phone": "HH",
+            "label": "h",
+            "hint": "Breathe out gently into the next vowel."
+          },
+          {
+            "phone": "IY",
+            "label": "ee · sheep",
+            "hint": "Practice the vowel in ‘sheep’. Its sound can change beside ‘r’."
+          },
+          {
+            "phone": "R",
+            "label": "r",
+            "hint": "Keep your tongue from touching the roof of your mouth."
+          }
+        ]
+      }
+    ],
+    "validation_status": "experimental_unvalidated",
+    "practice_ipa": "ðə ʃɪp ɪz hɪɹ"
   },
   {
     "id": "bad_bed",
     "text": "That is a bad bed",
     "reference_wav": "data/references/bad_bed.wav",
-    "target_words": ["bad", "bed"],
-    "target_phones": ["AE", "EH"],
-    "lesson_links": [{"title": "Learn this sound: AA as in bad", "url": "https://rachelsenglish.com/english-pronounce-aa-ae-vowel/"}]
+    "target_words": [
+      "bad",
+      "bed"
+    ],
+    "target_phones": [
+      "AE",
+      "EH"
+    ],
+    "lesson_links": [
+      {
+        "title": "Learn this sound: AA as in bad",
+        "url": "https://rachelsenglish.com/english-pronounce-aa-ae-vowel/"
+      }
+    ],
+    "assessment_targets": [
+      {
+        "word": "bad",
+        "phone": "AE",
+        "alternatives": [
+          "EH"
+        ]
+      }
+    ],
+    "content_alternatives": {
+      "bad": [
+        "bed"
+      ],
+      "bed": [
+        "bad"
+      ]
+    },
+    "practice_tip": "Practice “bad” and “bed”: open your jaw a little more for the vowel in “bad”.",
+    "practice_words": [
+      {
+        "word": "That",
+        "sounds": [
+          {
+            "phone": "DH",
+            "label": "th · this",
+            "hint": "Use the tongue position of ‘th’, with your voice switched on."
+          },
+          {
+            "phone": "AE",
+            "label": "a · bad",
+            "hint": "Open your jaw a little more than for the vowel in ‘bed’."
+          },
+          {
+            "phone": "T",
+            "label": "t",
+            "hint": "Touch behind your upper teeth, then release the air."
+          }
+        ]
+      },
+      {
+        "word": "is",
+        "sounds": [
+          {
+            "phone": "IH",
+            "label": "i · ship",
+            "hint": "Practice ‘ship’ and ‘sheep’; listen for different vowel sounds."
+          },
+          {
+            "phone": "Z",
+            "label": "z",
+            "hint": "Make an ‘s’ shape and add your voice."
+          }
+        ]
+      },
+      {
+        "word": "a",
+        "sounds": [
+          {
+            "phone": "AH",
+            "label": "uh",
+            "hint": "Keep this unstressed vowel relaxed and short."
+          }
+        ]
+      },
+      {
+        "word": "bad",
+        "sounds": [
+          {
+            "phone": "B",
+            "label": "b",
+            "hint": "Close your lips, add your voice, then release."
+          },
+          {
+            "phone": "AE",
+            "label": "a · bad",
+            "hint": "Open your jaw a little more than for the vowel in ‘bed’."
+          },
+          {
+            "phone": "D",
+            "label": "d",
+            "hint": "Touch behind your upper teeth and release with your voice."
+          }
+        ]
+      },
+      {
+        "word": "bed",
+        "sounds": [
+          {
+            "phone": "B",
+            "label": "b",
+            "hint": "Close your lips, add your voice, then release."
+          },
+          {
+            "phone": "EH",
+            "label": "e · bed",
+            "hint": "Practice ‘bed’ beside ‘bad’ and listen for the vowel change."
+          },
+          {
+            "phone": "D",
+            "label": "d",
+            "hint": "Touch behind your upper teeth and release with your voice."
+          }
+        ]
+      }
+    ],
+    "validation_status": "experimental_unvalidated",
+    "practice_ipa": "ðæt ɪz ə bæd bɛd"
+  },
+  {
+    "id": "think_can",
+    "text": "I think we can",
+    "target_words": [
+      "think"
+    ],
+    "target_phones": [
+      "TH"
+    ],
+    "lesson_links": [
+      {
+        "title": "Learn this sound: TH consonants",
+        "url": "https://rachelsenglish.com/english-pronounce-th-consonants/"
+      }
+    ],
+    "assessment_targets": [
+      {
+        "word": "think",
+        "phone": "TH",
+        "alternatives": [
+          "S",
+          "T",
+          "F"
+        ]
+      }
+    ],
+    "content_alternatives": {
+      "think": [
+        "sink",
+        "tink",
+        "fink"
+      ]
+    },
+    "practice_tip": "Practice “think”: let air flow gently with your tongue tip lightly between your teeth.",
+    "practice_words": [
+      {
+        "word": "think",
+        "sounds": [
+          {
+            "phone": "TH",
+            "label": "th · think",
+            "hint": "Let air flow gently with your tongue tip lightly between your teeth."
+          },
+          {
+            "phone": "IH",
+            "label": "i · ship",
+            "hint": "Practice ‘ship’ and ‘sheep’; listen for different vowel sounds."
+          },
+          {
+            "phone": "NG",
+            "label": "ng · sing",
+            "hint": "Use the final sound of ‘sing’; let your voice hum through your nose."
+          },
+          {
+            "phone": "K",
+            "label": "k",
+            "hint": "Briefly stop air at the back of your mouth, then release it."
+          }
+        ]
+      }
+    ],
+    "validation_status": "experimental_unvalidated",
+    "practice_ipa": "aɪ θɪŋk wi kæn"
+  },
+  {
+    "id": "think_again",
+    "text": "Please think again",
+    "target_words": [
+      "think"
+    ],
+    "target_phones": [
+      "TH"
+    ],
+    "lesson_links": [
+      {
+        "title": "Learn this sound: TH consonants",
+        "url": "https://rachelsenglish.com/english-pronounce-th-consonants/"
+      }
+    ],
+    "assessment_targets": [
+      {
+        "word": "think",
+        "phone": "TH",
+        "alternatives": [
+          "S",
+          "T",
+          "F"
+        ]
+      }
+    ],
+    "content_alternatives": {
+      "think": [
+        "sink",
+        "tink",
+        "fink"
+      ]
+    },
+    "practice_tip": "Practice “think”: let air flow gently with your tongue tip lightly between your teeth.",
+    "practice_words": [
+      {
+        "word": "think",
+        "sounds": [
+          {
+            "phone": "TH",
+            "label": "th · think",
+            "hint": "Let air flow gently with your tongue tip lightly between your teeth."
+          },
+          {
+            "phone": "IH",
+            "label": "i · ship",
+            "hint": "Practice ‘ship’ and ‘sheep’; listen for different vowel sounds."
+          },
+          {
+            "phone": "NG",
+            "label": "ng · sing",
+            "hint": "Use the final sound of ‘sing’; let your voice hum through your nose."
+          },
+          {
+            "phone": "K",
+            "label": "k",
+            "hint": "Briefly stop air at the back of your mouth, then release it."
+          }
+        ]
+      }
+    ],
+    "validation_status": "experimental_unvalidated",
+    "practice_ipa": "pliz θɪŋk əˈɡɛn"
+  },
+  {
+    "id": "think_fine",
+    "text": "We think it is fine",
+    "target_words": [
+      "think"
+    ],
+    "target_phones": [
+      "TH"
+    ],
+    "lesson_links": [
+      {
+        "title": "Learn this sound: TH consonants",
+        "url": "https://rachelsenglish.com/english-pronounce-th-consonants/"
+      }
+    ],
+    "assessment_targets": [
+      {
+        "word": "think",
+        "phone": "TH",
+        "alternatives": [
+          "S",
+          "T",
+          "F"
+        ]
+      }
+    ],
+    "content_alternatives": {
+      "think": [
+        "sink",
+        "tink",
+        "fink"
+      ]
+    },
+    "practice_tip": "Practice “think”: let air flow gently with your tongue tip lightly between your teeth.",
+    "practice_words": [
+      {
+        "word": "think",
+        "sounds": [
+          {
+            "phone": "TH",
+            "label": "th · think",
+            "hint": "Let air flow gently with your tongue tip lightly between your teeth."
+          },
+          {
+            "phone": "IH",
+            "label": "i · ship",
+            "hint": "Practice ‘ship’ and ‘sheep’; listen for different vowel sounds."
+          },
+          {
+            "phone": "NG",
+            "label": "ng · sing",
+            "hint": "Use the final sound of ‘sing’; let your voice hum through your nose."
+          },
+          {
+            "phone": "K",
+            "label": "k",
+            "hint": "Briefly stop air at the back of your mouth, then release it."
+          }
+        ]
+      }
+    ],
+    "validation_status": "experimental_unvalidated",
+    "practice_ipa": "wi θɪŋk ɪt ɪz faɪn"
+  },
+  {
+    "id": "ship_see",
+    "text": "I see a ship",
+    "target_words": [
+      "ship"
+    ],
+    "target_phones": [
+      "IH"
+    ],
+    "lesson_links": [
+      {
+        "title": "Learn this sound: IH and the IH/EE contrast",
+        "url": "https://rachelsenglish.com/english-pronounce-ih-vowel/"
+      }
+    ],
+    "assessment_targets": [
+      {
+        "word": "ship",
+        "phone": "IH",
+        "alternatives": [
+          "IY"
+        ]
+      }
+    ],
+    "content_alternatives": {
+      "ship": [
+        "sheep"
+      ]
+    },
+    "practice_tip": "Practice “ship” and “sheep”: say each word slowly and listen for the different vowel sounds.",
+    "practice_words": [
+      {
+        "word": "ship",
+        "sounds": [
+          {
+            "phone": "SH",
+            "label": "sh",
+            "hint": "Round your lips slightly and make a soft ‘sh’."
+          },
+          {
+            "phone": "IH",
+            "label": "i · ship",
+            "hint": "Practice ‘ship’ and ‘sheep’; listen for different vowel sounds."
+          },
+          {
+            "phone": "P",
+            "label": "p",
+            "hint": "Close your lips, then release a small puff of air."
+          }
+        ]
+      }
+    ],
+    "validation_status": "experimental_unvalidated",
+    "practice_ipa": "aɪ si ə ʃɪp"
+  },
+  {
+    "id": "ship_big",
+    "text": "This ship is big",
+    "target_words": [
+      "ship"
+    ],
+    "target_phones": [
+      "IH"
+    ],
+    "lesson_links": [
+      {
+        "title": "Learn this sound: IH and the IH/EE contrast",
+        "url": "https://rachelsenglish.com/english-pronounce-ih-vowel/"
+      }
+    ],
+    "assessment_targets": [
+      {
+        "word": "ship",
+        "phone": "IH",
+        "alternatives": [
+          "IY"
+        ]
+      }
+    ],
+    "content_alternatives": {
+      "ship": [
+        "sheep"
+      ]
+    },
+    "practice_tip": "Practice “ship” and “sheep”: say each word slowly and listen for the different vowel sounds.",
+    "practice_words": [
+      {
+        "word": "ship",
+        "sounds": [
+          {
+            "phone": "SH",
+            "label": "sh",
+            "hint": "Round your lips slightly and make a soft ‘sh’."
+          },
+          {
+            "phone": "IH",
+            "label": "i · ship",
+            "hint": "Practice ‘ship’ and ‘sheep’; listen for different vowel sounds."
+          },
+          {
+            "phone": "P",
+            "label": "p",
+            "hint": "Close your lips, then release a small puff of air."
+          }
+        ]
+      }
+    ],
+    "validation_status": "experimental_unvalidated",
+    "practice_ipa": "ðɪs ʃɪp ɪz bɪɡ"
+  },
+  {
+    "id": "ship_coming",
+    "text": "A ship is coming",
+    "target_words": [
+      "ship"
+    ],
+    "target_phones": [
+      "IH"
+    ],
+    "lesson_links": [
+      {
+        "title": "Learn this sound: IH and the IH/EE contrast",
+        "url": "https://rachelsenglish.com/english-pronounce-ih-vowel/"
+      }
+    ],
+    "assessment_targets": [
+      {
+        "word": "ship",
+        "phone": "IH",
+        "alternatives": [
+          "IY"
+        ]
+      }
+    ],
+    "content_alternatives": {
+      "ship": [
+        "sheep"
+      ]
+    },
+    "practice_tip": "Practice “ship” and “sheep”: say each word slowly and listen for the different vowel sounds.",
+    "practice_words": [
+      {
+        "word": "ship",
+        "sounds": [
+          {
+            "phone": "SH",
+            "label": "sh",
+            "hint": "Round your lips slightly and make a soft ‘sh’."
+          },
+          {
+            "phone": "IH",
+            "label": "i · ship",
+            "hint": "Practice ‘ship’ and ‘sheep’; listen for different vowel sounds."
+          },
+          {
+            "phone": "P",
+            "label": "p",
+            "hint": "Close your lips, then release a small puff of air."
+          }
+        ]
+      }
+    ],
+    "validation_status": "experimental_unvalidated",
+    "practice_ipa": "ə ʃɪp ɪz ˈkʌmɪŋ"
+  },
+  {
+    "id": "bad_idea",
+    "text": "That was a bad idea",
+    "target_words": [
+      "bad"
+    ],
+    "target_phones": [
+      "AE"
+    ],
+    "lesson_links": [
+      {
+        "title": "Learn this sound: AA as in bad",
+        "url": "https://rachelsenglish.com/english-pronounce-aa-ae-vowel/"
+      }
+    ],
+    "assessment_targets": [
+      {
+        "word": "bad",
+        "phone": "AE",
+        "alternatives": [
+          "EH"
+        ]
+      }
+    ],
+    "content_alternatives": {
+      "bad": [
+        "bed"
+      ]
+    },
+    "practice_tip": "Practice “bad” and “bed”: open your jaw a little more for the vowel in “bad”.",
+    "practice_words": [
+      {
+        "word": "bad",
+        "sounds": [
+          {
+            "phone": "B",
+            "label": "b",
+            "hint": "Close your lips, add your voice, then release."
+          },
+          {
+            "phone": "AE",
+            "label": "a · bad",
+            "hint": "Open your jaw a little more than for the vowel in ‘bed’."
+          },
+          {
+            "phone": "D",
+            "label": "d",
+            "hint": "Touch behind your upper teeth and release with your voice."
+          }
+        ]
+      }
+    ],
+    "validation_status": "experimental_unvalidated",
+    "practice_ipa": "ðæt wəz ə bæd aɪˈdiə"
+  },
+  {
+    "id": "bad_day",
+    "text": "It is a bad day",
+    "target_words": [
+      "bad"
+    ],
+    "target_phones": [
+      "AE"
+    ],
+    "lesson_links": [
+      {
+        "title": "Learn this sound: AA as in bad",
+        "url": "https://rachelsenglish.com/english-pronounce-aa-ae-vowel/"
+      }
+    ],
+    "assessment_targets": [
+      {
+        "word": "bad",
+        "phone": "AE",
+        "alternatives": [
+          "EH"
+        ]
+      }
+    ],
+    "content_alternatives": {
+      "bad": [
+        "bed"
+      ]
+    },
+    "practice_tip": "Practice “bad” and “bed”: open your jaw a little more for the vowel in “bad”.",
+    "practice_words": [
+      {
+        "word": "bad",
+        "sounds": [
+          {
+            "phone": "B",
+            "label": "b",
+            "hint": "Close your lips, add your voice, then release."
+          },
+          {
+            "phone": "AE",
+            "label": "a · bad",
+            "hint": "Open your jaw a little more than for the vowel in ‘bed’."
+          },
+          {
+            "phone": "D",
+            "label": "d",
+            "hint": "Touch behind your upper teeth and release with your voice."
+          }
+        ]
+      }
+    ],
+    "validation_status": "experimental_unvalidated",
+    "practice_ipa": "ɪt ɪz ə bæd deɪ"
+  },
+  {
+    "id": "bad_plan",
+    "text": "This is a bad plan",
+    "target_words": [
+      "bad"
+    ],
+    "target_phones": [
+      "AE"
+    ],
+    "lesson_links": [
+      {
+        "title": "Learn this sound: AA as in bad",
+        "url": "https://rachelsenglish.com/english-pronounce-aa-ae-vowel/"
+      }
+    ],
+    "assessment_targets": [
+      {
+        "word": "bad",
+        "phone": "AE",
+        "alternatives": [
+          "EH"
+        ]
+      }
+    ],
+    "content_alternatives": {
+      "bad": [
+        "bed"
+      ]
+    },
+    "practice_tip": "Practice “bad” and “bed”: open your jaw a little more for the vowel in “bad”.",
+    "practice_words": [
+      {
+        "word": "bad",
+        "sounds": [
+          {
+            "phone": "B",
+            "label": "b",
+            "hint": "Close your lips, add your voice, then release."
+          },
+          {
+            "phone": "AE",
+            "label": "a · bad",
+            "hint": "Open your jaw a little more than for the vowel in ‘bed’."
+          },
+          {
+            "phone": "D",
+            "label": "d",
+            "hint": "Touch behind your upper teeth and release with your voice."
+          }
+        ]
+      }
+    ],
+    "validation_status": "experimental_unvalidated",
+    "practice_ipa": "ðɪs ɪz ə bæd plæn"
   }
 ]

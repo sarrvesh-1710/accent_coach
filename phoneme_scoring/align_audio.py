@@ -9,9 +9,14 @@ from pathlib import Path
 import hashlib
 import json
 import math
+import os
 import re
 import subprocess
 import tempfile
+try:
+    from .process_lock import alignment_lock
+except ImportError:  # Standalone scoring CLI.
+    from process_lock import alignment_lock
 
 import numpy as np
 from scipy.io import wavfile
@@ -196,6 +201,43 @@ def _normalize_mfa_endpoints(segments, duration):
     return corrections
 
 
+def attach_words(segments, tiers, duration):
+    """Associate phones with supplied-transcript words, never ASR verification."""
+    matches = [entries for name, entries in tiers.items() if name.lower() == "words"]
+    if len(matches) != 1:
+        return []
+    words = [dict(segment_id=f"w{i:04d}", word=label, start_sec=start, end_sec=end)
+             for i, (start, end, label) in enumerate(matches[0])
+             if label.strip().lower() not in {"", "<eps>", "sil", "sp"}]
+    if not words:
+        return []
+    _normalize_mfa_endpoints(words, duration)
+    for segment in segments:
+        # Require containment; don't guess a word across inconsistent boundaries.
+        candidates = [w for w in words if segment["start_sec"] >= w["start_sec"] - 1e-6
+                      and segment["end_sec"] <= w["end_sec"] + 1e-6]
+        if len(candidates) == 1:
+            segment.update(word_id=candidates[0]["segment_id"], word=candidates[0]["word"])
+    return words
+
+
+def run_mfa(args, *, stdout, stderr, timeout, check=False, creationflags=0):
+    """Kill the owned process tree on timeout, before releasing the MFA lock."""
+    process = subprocess.Popen(args, stdout=stdout, stderr=stderr, creationflags=creationflags)
+    try:
+        code = process.wait(timeout=timeout)
+        return subprocess.CompletedProcess(args, code)
+    except subprocess.TimeoutExpired:
+        if os.name == 'nt':
+            subprocess.run(['taskkill', '/PID', str(process.pid), '/T', '/F'],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                           creationflags=subprocess.CREATE_NO_WINDOW, timeout=10, check=False)
+        else:
+            process.kill()
+        process.wait(timeout=5)
+        raise
+
+
 def align_audio(audio, transcript, settings, run_dir) -> dict:
     """Invoke pretrained MFA and return available segments or unavailable.
 
@@ -227,9 +269,11 @@ def align_audio(audio, transcript, settings, run_dir) -> dict:
                 "--temporary_directory", str(work / "temp")]
         result.update(run_dir=str(work), audio_sha256=fingerprint, duration_sec=len(x) / sr,
                       sample_rate_hz=sr, transcript=transcript, command=args)
-        with (work / "mfa.log").open("w", encoding="utf-8") as log:
+        # MFA extracts shared acoustic files even when temporary directories differ.
+        # Serialize subprocesses across this user's app instances and test commands.
+        with alignment_lock(Path.home() / '.accent_coach' / 'mfa.lock'), (work / "mfa.log").open("w", encoding="utf-8") as log:
             try:
-                process = subprocess.run(args, stdout=log, stderr=subprocess.STDOUT,
+                process = run_mfa(args, stdout=log, stderr=subprocess.STDOUT,
                                          timeout=cfg["timeout_sec"], check=False,
                                          creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
             except FileNotFoundError as exc:
@@ -240,13 +284,16 @@ def align_audio(audio, transcript, settings, run_dir) -> dict:
             raise RuntimeError(f"MFA exited {process.returncode}; inspect {work / 'mfa.log'}")
         if not output.is_file() or output.stat().st_size == 0:
             raise ValueError("MFA output missing or empty")
-        entries = phone_tier(parse_textgrid(output), cfg["phone_tiers"])
+        tiers = parse_textgrid(output)
+        entries = phone_tier(tiers, cfg["phone_tiers"])
         segments = []
         for index, (start, end, label) in enumerate(entries):
             canonical, stress = split_phone(label)
             segments.append(dict(segment_id=f"p{index:04d}", canonical_phone=canonical,
                                  original_phone=label, stress=stress, start_sec=start, end_sec=end))
         result["boundary_rounding_corrections"] = _normalize_mfa_endpoints(segments, len(x) / sr)
+        result["words"] = attach_words(segments, tiers, len(x) / sr)
+        result["transcript_source"] = "supplied_prompt_not_recognized_speech"
         if not any(s["canonical_phone"].lower() not in ("", "sil", "sp", "spn", "<eps>") for s in segments):
             raise ValueError("No usable speech phones in alignment")
         result.update(status="available", segments=segments, textgrid_path=str(output))

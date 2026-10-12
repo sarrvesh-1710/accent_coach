@@ -96,12 +96,6 @@ def result_views(result):
     status = {"complete": "Analysis finished. Pronunciation grade unavailable.",
               "partial": "Analysis finished with limited evidence. Pronunciation grade unavailable.",
               "failed": "Analysis unavailable. Pronunciation grade unavailable. Check the messages below."}[state]
-    reference_stage = result.get("stage_statuses", {}).get("reference_audio", {})
-    if state == "failed" and reference_stage.get("status") == "unavailable":
-        status += "\n" + (reference_stage.get("message") or "Reference recording unavailable.")
-        prompt_text = result.get("prompt", {}).get("text")
-        if prompt_text:
-            status += f'\nThe reference WAV must say: "{prompt_text}". Add or replace it, then click Analyze again.'
     if result.get("results_path"):
         status += f"\nSaved attempt: {result['run_id']}"
     if state == "partial":
@@ -112,7 +106,7 @@ def result_views(result):
     messages = "\n".join(result["messages"])
     stage_rows = [[name, stage["status"], stage.get("message") or ""] for name, stage in result["stage_statuses"].items()]
     paths = result["audio_paths"]
-    measurements = {key: result.get(key, {}) for key in ("learner_audio", "reference_audio", "learner_dsp", "reference_dsp", "comparison")}
+    measurements = {key: result.get(key, {}) for key in ("learner_audio", "reference_audio", "learner_dsp", "reference_dsp", "comparison", "spoken_words_verification", "target_assessment")}
     return (status, pitch_html(result), evidence_rows(result), "\n\n".join(result["feedback"]),
             paths["original"], paths["reference"], measurements, stage_rows, messages, result["results_path"])
 
@@ -127,7 +121,7 @@ def build_app():
         upload = gr.File(label="Learner WAV (maximum 5 seconds)", file_types=[".wav"], type="filepath")
         analyze = gr.Button("Analyze", variant="primary")
         status = gr.Textbox(label="Processing status", value="Ready", interactive=False)
-        plot = gr.HTML("<p>Analyze a recording to compare pitch.</p>")
+        plot = gr.HTML("<p>Analyze a recording to view its pitch. No reference is required.</p>")
         gr.Markdown("**Sound evidence**\n\nThese results do not assign pronunciation pass/fail. Model margin compares the expected sound with the strongest alternative: positive favors expected, negative favors the alternative. It is not a confidence percentage. Single-frame comparisons remain limited evidence, not confirmed errors. Evidence frames shows retained/total model frames. Blank cells mean no comparison is available.")
         evidence = gr.Dataframe(headers=["Segment", "Expected phone", "Start (s)", "End (s)", "Model margin", "Units", "Alternative phone", "Evidence frames", "Details", "Status"],
                                 datatype=["str", "str", "number", "number", "number", "str", "str", "str", "str", "str"], interactive=False)

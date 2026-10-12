@@ -243,6 +243,14 @@ def score_phonemes(audio, alignment, settings) -> dict:
                 special.add(value)
         result["segments"] = _score_logprobs(logp, centers, segments, mapping, vocab,
                                               special, settings["scoring"])
+        if settings.get("_assessment_targets"):
+            try:
+                sequence_module = import_module(".sequence_evidence", __package__) if __package__ else import_module("sequence_evidence")
+                result["sequence_evidence"] = sequence_module.compare_targets(
+                    logp, segments, result["segments"], mapping, vocab, special, blank,
+                    settings["_assessment_targets"], settings.get("target_assessment", {}), _resolve)
+            except Exception as exc:
+                result["sequence_evidence"] = dict(status="unavailable", targets=[], reason=f"{type(exc).__name__}: {exc}")
         result.update(status="available", model_id=mc["id"],
                       model_revision=getattr(model.config, "_commit_hash", None) or mc["revision"],
                       device="cpu", audio_sha256=fingerprint, timing=timing,
@@ -579,12 +587,12 @@ def self_test():
 
         def test_mfa_failures(self):
             with tempfile.TemporaryDirectory() as tmp:
-                with patch.object(_alignment_module.subprocess, "run", side_effect=FileNotFoundError("mfa missing")):
+                with patch.object(_alignment_module, "run_mfa", side_effect=FileNotFoundError("mfa missing")):
                     self.assertEqual(align_audio(self.audio, "test", self.settings, tmp)["status"], "unavailable")
-                with patch.object(_alignment_module.subprocess, "run") as run:
+                with patch.object(_alignment_module, "run_mfa") as run:
                     run.return_value.returncode = 0
                     self.assertIn("missing", align_audio(self.audio, "test", self.settings, tmp)["reason"])
-                with patch.object(_alignment_module.subprocess, "run") as run:
+                with patch.object(_alignment_module, "run_mfa") as run:
                     run.return_value.returncode = 1
                     self.assertIn("exited 1", align_audio(self.audio, "test", self.settings, tmp)["reason"])
 
@@ -595,7 +603,7 @@ def self_test():
                 dest.write_text('File type = "ooTextFile short"\n"TextGrid"\n0\n1\n<exists>\n1\n"IntervalTier"\n"phones"\n0\n1\n1\n0\n1\n"IH1"\n')
                 return SimpleNamespace(returncode=0)
             with tempfile.TemporaryDirectory() as tmp:
-                with patch.object(_alignment_module.subprocess, "run", side_effect=fake_mfa):
+                with patch.object(_alignment_module, "run_mfa", side_effect=fake_mfa):
                     result = align_audio(self.audio, "test", self.settings, tmp)
                 self.assertEqual(result["status"], "available")
                 self.assertEqual(result["segments"][0]["stress"], 1)

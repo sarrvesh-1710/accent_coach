@@ -18,7 +18,11 @@ def make_feedback(result, prompt) -> list[str]:
         relation = "longer than" if ratio > 1 else "shorter than" if ratio < 1 else "the same duration as"
         messages.append(f"Your recording is {relation} the reference (duration ratio {ratio:.2f}). Timing alone does not establish a pronunciation error.")
     for who, key in (("Your recording", "learner_dsp"), ("The reference", "reference_dsp")):
+        if key == "reference_dsp" and not result.get("reference_comparison_requested", False):
+            continue
         dsp = result.get(key, {})
+        if key == "reference_dsp" and not dsp:
+            continue
         if dsp.get("status") not in {"ok", "warning"}:
             messages.append(f"{who}: acoustic measurements unavailable.")
         elif not any(dsp.get("voiced_mask", [])):
@@ -46,5 +50,16 @@ def make_feedback(result, prompt) -> list[str]:
             messages.append(cues[phone])
     if prompt:
         messages.append("Practice cues follow the selected prompt; they are not detected errors or measurements of tongue position.")
-        messages.append("A team demo reference supports comparison but is not automatically a validated General American target.")
+        content = result.get("spoken_words_verification", {})
+        if content.get("transcript"):
+            messages.append(f"Speech recognizer heard: {content['transcript']}. Recognition can be wrong; it is not a pronunciation grade.")
+        else:
+            messages.append("Independent sentence check unavailable for this attempt.")
+        for target in result.get("target_assessment", {}).get("targets", []):
+            labels = {"expected_supported": "Model supports the expected sound",
+                      "alternative_favored": "Model favors an alternative sound",
+                      "insufficient_evidence": "Not enough evidence"}
+            messages.append(f"{target['word']} ({target['expected_phone']}): {labels[target['status']]}. Experimental target comparison only.")
+        if result.get("audio_paths", {}).get("reference"):
+            messages.append("The optional team example is a listening aid, not a validated General American target.")
     return messages

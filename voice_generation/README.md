@@ -51,3 +51,7 @@ See [the Kokoro timing and listening runbook](KOKORO_RUNBOOK.md) for the neural 
 ## Day 2 playback component
 
 Run the isolated Hear an example demo on localhost:8762. See [Day 2 launch and integration instructions](DAY2_RUNBOOK.md).
+
+## Day 1–2 completion and handoff
+
+See [the deliverables checklist](DELIVERABLES.md). The shareable evidence packet is under ignored `runs/parthiban_day1_day2_deliverables.zip`.

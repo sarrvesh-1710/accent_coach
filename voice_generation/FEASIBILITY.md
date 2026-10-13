@@ -27,8 +27,7 @@ and ancillary checkpoints also need a license inventory before distribution.
 The source suggests Python 3.10 for Windows/Linux/macOS and strongly recommends
 a GPU for real-time conversion. Its RTX 3060 laptop timing example is for the
 v1 tiny model, so it does not establish v2 memory or latency requirements.
-An exact v2 minimum VRAM requirement was not verified. Hardware inventory access
-was unavailable in this run; no assertion about this laptop's GPU is made.
+An exact v2 minimum VRAM requirement was not verified. Hardware was checked during the subsequent Kokoro experiment: 11th Gen Intel(R) Core(TM) i7-1185G7 @ 3.00GHz, 15.73 GiB installed RAM, and Intel(R) Iris(R) Xe Graphics. Kokoro was benchmarked on CPU. No NVIDIA/CUDA GPU was listed, and Seed-VC v2 performance on this laptop remains untested.
 The upstream repository is archived, which also increases maintenance uncertainty.
 
 Next experiment: in a separate Python 3.10 environment, pin the upstream revision,

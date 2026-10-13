@@ -1,0 +1,1353 @@
+From f0b841c82161c8060311bf956cf51f9ef4db739e Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Tue, 13 Oct 2026 21:51:39 +0800
+Subject: [PATCH] Integrate local sign-in profiles and private saved practice
+
+---
+ .gitignore                         |   3 +
+ README.md                          |  15 ++
+ accounts/__init__.py               |   1 +
+ accounts/store.py                  | 205 ++++++++++++++++
+ accounts/web.py                    | 364 +++++++++++++++++++++++++++++
+ analysis_service.py                |  16 +-
+ app_2.py                           |   2 +-
+ docs/ACCOUNTS_SETUP.md             |  57 +++++
+ pipeline.py                        |   4 +-
+ requirements-accounts.txt          |   6 +
+ site_pages.py                      |  12 +-
+ site_server.py                     |  38 +--
+ tests/test_accounts_integration.py | 166 +++++++++++++
+ tests/test_site.py                 |  17 +-
+ web_assets/accounts.css            |   1 +
+ web_assets/accounts.js             | 187 +++++++++++++++
+ 16 files changed, 1043 insertions(+), 51 deletions(-)
+ create mode 100644 accounts/__init__.py
+ create mode 100644 accounts/store.py
+ create mode 100644 accounts/web.py
+ create mode 100644 docs/ACCOUNTS_SETUP.md
+ create mode 100644 requirements-accounts.txt
+ create mode 100644 tests/test_accounts_integration.py
+ create mode 100644 web_assets/accounts.css
+ create mode 100644 web_assets/accounts.js
+
+diff --git a/.gitignore b/.gitignore
+index 0dfbcd9..3cfa1e2 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -223,3 +223,6 @@ __marimo__/
+ phoneme_scoring/settings.local.json
+ phoneme_scoring/runs/
+ phoneme_scoring/L2-ARCTIC/
++
++# Private account database, recording blobs, and temporary analysis files
++/private_data/
+diff --git a/README.md b/README.md
+index 52992ec..85973bc 100644
+--- a/README.md
++++ b/README.md
+@@ -1,3 +1,18 @@
++# Local account website: October 13, 2026
++
++The website now has real local sign-up/sign-in, **My profile**, and **My history**. New recordings and analysis results are stored under the signed-in account and remain after restarting the app.
++
++From your existing project environment:
++
++```powershell
++python -m pip install -r requirements-accounts.txt
++python site_server.py
++```
++
++Open `http://127.0.0.1:7861/` and create an account. `python app_2.py` starts the same new site. Models/MFA still use your existing configuration. See [account setup and verification](docs/ACCOUNTS_SETUP.md). This integrated version supersedes the earlier standalone Day 1 patch. Old unowned `runs/` history is preserved separately.
++
++The older release notes below describe previous versions. The October 13 account setup above is the current launch path.
++
+ # accent_coach
+ 
+ ## Parallel team work: October 12, 2026
+diff --git a/accounts/__init__.py b/accounts/__init__.py
+new file mode 100644
+index 0000000..27cf651
+--- /dev/null
++++ b/accounts/__init__.py
+@@ -0,0 +1 @@
++"""Persistent local accounts and owner-authorized practice storage."""
+diff --git a/accounts/store.py b/accounts/store.py
+new file mode 100644
+index 0000000..be75c74
+--- /dev/null
++++ b/accounts/store.py
+@@ -0,0 +1,205 @@
++"""SQLite transactions for accounts, opaque login sessions and private attempts."""
++from contextlib import contextmanager
++import hashlib
++import json
++from pathlib import Path
++import re
++import secrets
++import sqlite3
++import time
++import uuid
++
++from argon2 import PasswordHasher
++from argon2.exceptions import VerificationError, InvalidHashError
++
++GOALS = ('TH', 'IH', 'AE')
++
++
++class Store:
++    def __init__(self, root):
++        self.root = Path(root).resolve()
++        self.root.mkdir(parents=True, exist_ok=True)
++        self.db = self.root / 'accounts.sqlite3'
++        self.hasher = PasswordHasher()
++        self.dummy_hash = self.hasher.hash(secrets.token_urlsafe(24))
++        with self.connect() as db:
++            db.execute('PRAGMA journal_mode=WAL')
++            db.executescript('''
++                CREATE TABLE IF NOT EXISTS users (
++                    id TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL,
++                    password TEXT NOT NULL, display_name TEXT NOT NULL,
++                    goals TEXT NOT NULL DEFAULT '[]');
++                CREATE TABLE IF NOT EXISTS sessions (
++                    token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id),
++                    csrf TEXT NOT NULL, expires REAL NOT NULL);
++                CREATE TABLE IF NOT EXISTS attempts (
++                    id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id),
++                    prompt_id TEXT NOT NULL, sentence TEXT NOT NULL, created REAL NOT NULL,
++                    status TEXT NOT NULL, message TEXT NOT NULL, audio BLOB,
++                    result TEXT, deleted INTEGER NOT NULL DEFAULT 0);
++                CREATE INDEX IF NOT EXISTS owner_attempts ON attempts(user_id, created);
++                CREATE TABLE IF NOT EXISTS auth_limits (
++                    key TEXT PRIMARY KEY, started REAL NOT NULL, count INTEGER NOT NULL);
++            ''')
++        try:
++            self.db.chmod(0o600)
++        except OSError:
++            pass
++
++    @contextmanager
++    def connect(self):
++        db = sqlite3.connect(self.db, timeout=15)
++        db.row_factory = sqlite3.Row
++        db.execute('PRAGMA foreign_keys=ON')
++        db.execute('PRAGMA secure_delete=ON')
++        try:
++            with db:
++                yield db
++        finally:
++            db.close()
++
++    def throttle(self, key):
++        """Bound credential attempts per source and per account in a rolling window."""
++        key = hashlib.sha256(key.encode()).hexdigest()
++        now = time.time()
++        with self.connect() as db:
++            db.execute('BEGIN IMMEDIATE')
++            db.execute('DELETE FROM auth_limits WHERE started < ?', (now - 900,))
++            row = db.execute('SELECT count FROM auth_limits WHERE key=?', (key,)).fetchone()
++            if row and row['count'] >= 30:
++                return False
++            db.execute('INSERT INTO auth_limits VALUES (?, ?, 1) ON CONFLICT(key) DO UPDATE SET count=count+1', (key, now))
++            return True
++
++    def register(self, username, password, display_name):
++        username = username.strip().lower()
++        display_name = display_name.strip()
++        if not re.fullmatch(r'[a-z0-9_]{3,32}', username):
++            raise ValueError('Use 3–32 letters, numbers or underscores for your username.')
++        if not 12 <= len(password) <= 128:
++            raise ValueError('Use a password between 12 and 128 characters.')
++        if not 1 <= len(display_name) <= 60:
++            raise ValueError('Enter a display name of 1–60 characters.')
++        user_id = uuid.uuid4().hex
++        hashed = self.hasher.hash(password)
++        try:
++            with self.connect() as db:
++                db.execute('INSERT INTO users (id,username,password,display_name) VALUES (?,?,?,?)',
++                           (user_id, username, hashed, display_name))
++        except sqlite3.IntegrityError:
++            raise ValueError('That username is already taken.') from None
++        return user_id
++
++    def login(self, username, password):
++        if len(password) > 128:
++            return None
++        with self.connect() as db:
++            row = db.execute('SELECT * FROM users WHERE username=?', (username.strip().lower(),)).fetchone()
++        try:
++            self.hasher.verify(row['password'] if row else self.dummy_hash, password)
++        except (VerificationError, InvalidHashError):
++            return None
++        if not row:
++            return None
++        if self.hasher.check_needs_rehash(row['password']):
++            with self.connect() as db:
++                db.execute('UPDATE users SET password=? WHERE id=?', (self.hasher.hash(password), row['id']))
++        return row['id']
++
++    def new_session(self, owner):
++        token, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
++        with self.connect() as db:
++            db.execute('DELETE FROM sessions WHERE expires < ?', (time.time(),))
++            db.execute('INSERT INTO sessions VALUES (?,?,?,?)',
++                       (hashlib.sha256(token.encode()).hexdigest(), owner, csrf, time.time()+7*86400))
++        return token
++
++    def session(self, token):
++        if not token or len(token) > 128:
++            return None
++        with self.connect() as db:
++            row = db.execute('''SELECT u.id,u.username,u.display_name,u.goals,s.csrf
++                FROM sessions s JOIN users u ON s.user_id=u.id WHERE s.token_hash=? AND s.expires>?''',
++                (hashlib.sha256(token.encode()).hexdigest(), time.time())).fetchone()
++        if not row:
++            return None
++        user = dict(row)
++        user['goals'] = json.loads(user['goals'])
++        return user
++
++    def logout(self, token):
++        with self.connect() as db:
++            db.execute('DELETE FROM sessions WHERE token_hash=?', (hashlib.sha256(token.encode()).hexdigest(),))
++
++    def profile(self, owner, display_name, goals):
++        if not isinstance(display_name, str) or not 1 <= len(display_name.strip()) <= 60:
++            raise ValueError('Enter a display name of 1–60 characters.')
++        if not isinstance(goals, list) or any(g not in GOALS for g in goals):
++            raise ValueError('Choose one of the available practice sounds.')
++        with self.connect() as db:
++            db.execute('UPDATE users SET display_name=?,goals=? WHERE id=?',
++                       (display_name.strip(), json.dumps(list(dict.fromkeys(goals))), owner))
++
++    def create_attempt(self, owner, prompt, audio):
++        identity = uuid.uuid4().hex
++        with self.connect() as db:
++            db.execute('BEGIN IMMEDIATE')
++            if db.execute("SELECT 1 FROM attempts WHERE user_id=? AND deleted=0 AND status IN ('queued','processing')", (owner,)).fetchone():
++                raise ValueError('You already have a recording waiting or being analyzed. Open History to follow it.')
++            db.execute('INSERT INTO attempts VALUES (?,?,?,?,?,?,?,?,?,0)',
++                       (identity, owner, prompt['id'], prompt['text'], time.time(), 'queued',
++                        'Your recording is saved and waiting for analysis.', audio, None))
++        return identity
++
++    def get_attempt(self, owner, identity, audio=False):
++        fields = '*' if audio else 'id,prompt_id,sentence,created,status,message,result'
++        with self.connect() as db:
++            row = db.execute(f'SELECT {fields} FROM attempts WHERE id=? AND user_id=? AND deleted=0', (identity, owner)).fetchone()
++        if row is None:
++            raise LookupError('Attempt not found.')
++        row = dict(row)
++        if row.get('result'):
++            row['result'] = json.loads(row['result'])
++        return row
++
++    def history(self, owner):
++        with self.connect() as db:
++            rows = db.execute('''SELECT id,prompt_id,sentence,created,status,message FROM attempts
++                WHERE user_id=? AND deleted=0 ORDER BY created DESC LIMIT 100''', (owner,)).fetchall()
++        return [dict(r) for r in rows]
++
++    def progress(self, owner, identity, message):
++        with self.connect() as db:
++            return db.execute("UPDATE attempts SET status='processing',message=? WHERE id=? AND user_id=? AND deleted=0 AND status IN ('queued','processing')",
++                              (message, identity, owner)).rowcount == 1
++
++    def finish(self, owner, identity, result=None, error=None):
++        status = 'failed' if error or (result and result.get('overall_status') == 'failed') else 'completed'
++        message = error or ('Processing failed. Your recording is saved; check the result for details.' if status == 'failed'
++                            else 'Analysis finished. Recording and results are saved to your account.')
++        with self.connect() as db:
++            return db.execute("""UPDATE attempts SET status=?,message=?,result=? WHERE id=? AND user_id=?
++                AND deleted=0 AND status IN ('queued','processing')""",
++                (status, message, json.dumps(result, ensure_ascii=False, allow_nan=False) if result else None, identity, owner)).rowcount == 1
++
++    def delete_attempt(self, owner, identity):
++        with self.connect() as db:
++            changed = db.execute("UPDATE attempts SET deleted=1,audio=NULL,result=NULL,message='',status='cancelled' WHERE id=? AND user_id=? AND deleted=0", (identity, owner)).rowcount
++        if not changed:
++            raise LookupError('Attempt not found.')
++
++    def recover_interrupted(self):
++        with self.connect() as db:
++            db.execute("""UPDATE attempts SET status='failed',message='The app restarted before analysis finished. Your recording is saved; please record or upload again.'
++                WHERE deleted=0 AND status IN ('queued','processing')""")
++
++    def suggestions(self, owner, goals):
++        with self.connect() as db:
++            rows = db.execute("SELECT result FROM attempts WHERE user_id=? AND deleted=0 AND status='completed' AND result IS NOT NULL ORDER BY created DESC LIMIT 30", (owner,)).fetchall()
++        phones = []
++        for row in rows:
++            for target in json.loads(row['result']).get('target_assessment', {}).get('targets', []):
++                phone = target.get('expected_phone')
++                if target.get('status') == 'alternative_favored' and phone in GOALS and phone not in phones and (not goals or phone in goals):
++                    phones.append(phone)
++        return phones[:3]
+diff --git a/accounts/web.py b/accounts/web.py
+new file mode 100644
+index 0000000..c1fe4c8
+--- /dev/null
++++ b/accounts/web.py
+@@ -0,0 +1,364 @@
++"""Authenticated website and private playback; no Gradio file cache is exposed."""
++from concurrent.futures import ThreadPoolExecutor
++from contextlib import asynccontextmanager
++import html
++import io
++import json
++import logging
++import os
++from pathlib import Path
++import secrets
++import shutil
++import tempfile
++import threading
++
++from fastapi import FastAPI, Request, HTTPException
++from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
++from starlette.middleware.trustedhost import TrustedHostMiddleware
++import numpy as np
++import soundfile as sf
++
++from accounts.store import Store, GOALS
++from site_pages import ROOT, page_html
++
++COOKIE = 'accent_session'
++MAX_AUDIO = 10 * 1024 * 1024
++
++
++def clean_result(value):
++    """Keep diagnostic data but omit internal paths/settings before download."""
++    if isinstance(value, dict):
++        return {k: clean_result(v) for k, v in value.items()
++                if k not in {'settings', 'audio_paths', 'results_path', 'path', 'wav_path', 'output_dir', 'textgrid_path', 'samples'}}
++    if isinstance(value, list):
++        return [clean_result(v) for v in value]
++    return value
++
++
++class Jobs:
++    def __init__(self, store, analyzer):
++        self.store, self.analyzer = store, analyzer
++        self.pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix='private-analysis')
++        self.slots = threading.BoundedSemaphore(8)
++
++    def submit(self, owner, identity):
++        self.pool.submit(self.run, owner, identity)
++
++    def run(self, owner, identity):
++        folder = None
++        try:
++            attempt = self.store.get_attempt(owner, identity, audio=True)
++            if not self.store.progress(owner, identity, 'Preparing your recording'):
++                return
++            work = self.store.root / 'work'
++            work.mkdir(exist_ok=True)
++            folder = Path(tempfile.mkdtemp(prefix='attempt-', dir=work))
++            recording = folder / 'learner.wav'
++            recording.write_bytes(attempt['audio'])
++            result = self.analyzer(str(recording), attempt['prompt_id'], compare_reference=False,
++                output_root=str(folder / 'results'),
++                progress_callback=lambda message: self.store.progress(owner, identity, message))
++            self.store.finish(owner, identity, clean_result(result))
++        except LookupError:
++            pass  # Deleted while queued: no file or result is recreated.
++        except TimeoutError:
++            self.store.finish(owner, identity, error='Analysis timed out. Your recording is saved. Please try again.')
++        except Exception:
++            logging.exception('Private attempt processing failed')
++            self.store.finish(owner, identity, error='Analysis could not finish. Your recording is saved. Check the local app console and try again.')
++        finally:
++            if folder:
++                shutil.rmtree(folder, ignore_errors=True)
++            self.slots.release()
++
++    def close(self):
++        self.pool.shutdown(wait=True)
++
++
++def private_site(data_root=None, analyzer=None, prompts=None):
++    if analyzer is None:
++        from analysis_service import run_attempt
++        analyzer = run_attempt
++    if prompts is None:
++        from pipeline import load_prompts
++        prompts = load_prompts()
++    catalog = {p['id']: p for p in prompts}
++    store = Store(data_root or os.environ.get('ACCENT_COACH_DATA_DIR', ROOT / 'private_data'))
++    jobs = Jobs(store, analyzer)
++
++    @asynccontextmanager
++    async def lifespan(app):
++        store.recover_interrupted()
++        # Only this private site's expired intermediate jobs; never old runs/.
++        work = store.root / 'work'
++        if work.exists():
++            shutil.rmtree(work)
++        yield
++        jobs.close()
++        from analysis_service import SERVICE
++        SERVICE.close()
++
++    site = FastAPI(title='Accent Coach', docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
++    site.state.store, site.state.jobs = store, jobs
++    site.add_middleware(TrustedHostMiddleware, allowed_hosts=['localhost', '127.0.0.1', '[::1]'])
++
++    @site.middleware('http')
++    async def private_headers(request, call_next):
++        response = await call_next(request)
++        if not request.url.path.startswith('/site-assets/'):
++            response.headers['Cache-Control'] = 'no-store'
++        response.headers['X-Content-Type-Options'] = 'nosniff'
++        response.headers['Referrer-Policy'] = 'same-origin'
++        response.headers['X-Frame-Options'] = 'DENY'
++        response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
++        return response
++
++    def current(request):
++        return store.session(request.cookies.get(COOKIE))
++
++    def require(request):
++        user = current(request)
++        if not user:
++            raise HTTPException(401, 'Sign in to continue.')
++        return user
++
++    def csrf(request, token, expected):
++        origin = request.headers.get('origin')
++        if origin and origin != str(request.base_url).rstrip('/'):
++            raise HTTPException(403, 'Please reload this page and try again.')
++        if not token or not expected or not secrets.compare_digest(str(token), str(expected)):
++            raise HTTPException(403, 'Please reload this page and try again.')
++
++    async def read_body(request, limit):
++        data = bytearray()
++        async for chunk in request.stream():
++            data.extend(chunk)
++            if len(data) > limit:
++                raise HTTPException(413, 'This upload is too large.')
++        return bytes(data)
++
++    async def json_body(request):
++        try:
++            value = json.loads(await read_body(request, 8192))
++        except (ValueError, UnicodeError):
++            raise HTTPException(422, 'Invalid request.') from None
++        if not isinstance(value, dict):
++            raise HTTPException(422, 'Invalid request.')
++        return value
++
++    def shell(title, body, path, user=None, token=None):
++        account_nav = '<nav class="account-nav" aria-label="Account">'
++        if user:
++            account_nav += f'<span>Signed in as {html.escape(user["display_name"])}</span><form action="/logout" method="post"><input type="hidden" name="csrf" value="{user["csrf"]}"><button>Sign out</button></form>'
++        account_nav += '</nav>'
++        meta = f'<meta name="csrf-token" content="{html.escape(user["csrf"] if user else (token or ""), quote=True)}">'
++        content = page_html(title, 'Private English pronunciation practice and saved recordings.',
++                            (account_nav if user else '') + body, path)
++        return content.replace('</head>', meta + '<link rel="stylesheet" href="/site-assets/accounts.css"><script src="/site-assets/accounts.js" defer></script></head>')
++
++    def auth_page(request, signup=False, error='', status=200):
++        token = request.cookies.get('accent_login_csrf') or secrets.token_urlsafe(32)
++        if len(token) > 128:
++            token = secrets.token_urlsafe(32)
++        action, title = ('/signup', 'Create your account') if signup else ('/login', 'Sign in')
++        name = '<label>Display name<input name="display_name" maxlength="60" autocomplete="name" required></label>' if signup else ''
++        body = f'''<section class="account-card"><p class="eyebrow">Accent Coach</p><h1>{title}</h1>
++        <p>Your profile, recordings and results are saved on this computer under your account.</p>
++        <p class="form-error" role="alert">{html.escape(error)}</p>
++        <form action="{action}" method="post" class="account-form">
++        <input type="hidden" name="csrf" value="{html.escape(token, quote=True)}">{name}
++        <label>Username<input name="username" minlength="3" maxlength="32" pattern="[A-Za-z0-9_]+" autocomplete="username" required></label>
++        <label>Password<input type="password" name="password" minlength="12" maxlength="128" autocomplete="{'new-password' if signup else 'current-password'}" required></label>
++        <p>Use at least 12 characters for your password.</p><button class="primary">{title}</button></form>
++        <p><a href="{'/login' if signup else '/signup'}">{'Already have an account? Sign in' if signup else 'New here? Create an account'}</a></p></section>'''
++        response = HTMLResponse(shell(title, body, action, token=token), status_code=status)
++        response.set_cookie('accent_login_csrf', token, httponly=True, samesite='strict', secure=request.url.scheme == 'https', max_age=3600)
++        return response
++
++    @site.get('/')
++    def home(request: Request):
++        return RedirectResponse('/practice' if current(request) else '/login', status_code=303)
++
++    @site.get('/login')
++    def login_page(request: Request):
++        return auth_page(request)
++
++    @site.get('/signup')
++    def signup_page(request: Request):
++        return auth_page(request, signup=True)
++
++    @site.post('/login')
++    @site.post('/signup')
++    async def authenticate(request: Request):
++        from urllib.parse import parse_qs
++        signup = request.url.path == '/signup'
++        body = (await read_body(request, 8192)).decode('utf-8', errors='replace')
++        form = {k: v[-1] for k, v in parse_qs(body).items()}
++        csrf(request, form.get('csrf'), request.cookies.get('accent_login_csrf'))
++        username, password = form.get('username', ''), form.get('password', '')
++        source = request.client.host if request.client else 'local'
++        if not store.throttle('ip:'+source) or not store.throttle('name:'+username.strip().lower()):
++            return auth_page(request, signup, 'Too many sign-in attempts. Try again in 15 minutes.', 429)
++        try:
++            owner = store.register(username, password, form.get('display_name', '')) if signup else store.login(username, password)
++        except ValueError as exc:
++            return auth_page(request, signup, str(exc), 422)
++        if owner is None:
++            return auth_page(request, signup, 'Username or password is incorrect.', 401)
++        if request.cookies.get(COOKIE):
++            store.logout(request.cookies[COOKIE])
++        response = RedirectResponse('/practice', status_code=303)
++        response.set_cookie(COOKIE, store.new_session(owner), httponly=True, samesite='strict', secure=request.url.scheme == 'https', max_age=7*86400)
++        response.delete_cookie('accent_login_csrf')
++        return response
++
++    @site.post('/logout')
++    async def logout(request: Request):
++        from urllib.parse import parse_qs
++        user = require(request)
++        data = parse_qs((await read_body(request, 8192)).decode('utf-8', errors='replace'))
++        csrf(request, data.get('csrf', [''])[0], user['csrf'])
++        store.logout(request.cookies.get(COOKIE, ''))
++        response = RedirectResponse('/login', status_code=303)
++        response.delete_cookie(COOKIE)
++        return response
++
++    @site.get('/practice')
++    def practice(request: Request):
++        user = current(request)
++        if not user:
++            return RedirectResponse('/login', status_code=303)
++        options = ''.join(f'<option value="{html.escape(p["id"], quote=True)}">{html.escape(p["text"])}</option>' for p in prompts)
++        body = f'''<h1>Practice English pronunciation.</h1><p>Choose a sentence, record up to five seconds, then review your saved result.</p>
++        <section class="account-card"><label for="lesson">Practice sentence</label><select id="lesson">{options}</select>
++        <p id="lesson-hint"></p><audio id="example" controls></audio><p>Synthetic listening example; not used to score your voice.</p>
++        <div class="record-actions"><button id="record">Record my voice</button><button id="stop" disabled>Stop recording</button></div>
++        <label>Or upload a WAV<input id="recording-file" type="file" accept=".wav,audio/wav"></label>
++        <audio id="preview" controls hidden></audio><button id="analyze" class="primary" disabled>Check and save my recording</button>
++        <p id="practice-status" role="status" aria-live="polite">Your recordings and results will appear in My history.</p></section>
++        <section id="attempt-result" class="account-card" hidden></section>
++        <section class="account-card"><h2>Practice next</h2><p id="suggestions">Set your practice goals in My profile.</p></section>'''
++        return HTMLResponse(shell('English pronunciation practice', body, '/practice', user))
++
++    @site.get('/profile')
++    def profile_page(request: Request):
++        user = current(request)
++        if not user:
++            return RedirectResponse('/login', status_code=303)
++        goals = ''.join(f'<label class="goal"><input type="checkbox" name="goal" value="{g}" {"checked" if g in user["goals"] else ""}> {g}</label>' for g in GOALS)
++        body = f'''<h1>My profile</h1><section class="account-card"><p>Username: <strong>{html.escape(user['username'])}</strong></p>
++        <form id="profile-form" class="account-form"><label>Display name<input id="display-name" value="{html.escape(user['display_name'], quote=True)}" maxlength="60" required></label>
++        <p>Target accent: General American English</p><fieldset><legend>Sounds I want to practice</legend>{goals}</fieldset>
++        <p>TH as in think, IH as in ship, AE as in bad. Leave all unchecked for general suggestions.</p>
++        <button class="primary">Save profile</button><p id="profile-status" role="status"></p></form></section>'''
++        return HTMLResponse(shell('My profile', body, '/profile', user))
++
++    @site.get('/history')
++    def history_page(request: Request):
++        user = current(request)
++        if not user:
++            return RedirectResponse('/login', status_code=303)
++        body = '''<h1>My saved attempts</h1><p>Recordings and results stay here when you sign out or restart the app.</p>
++        <p>Model feedback is experimental. Changes between attempts do not establish improvement.</p>
++        <p id="history-status" role="status"></p><div id="history-list"></div><section id="attempt-result" class="account-card" hidden></section>'''
++        return HTMLResponse(shell('My history', body, '/history', user))
++
++    @site.get('/api/me')
++    def me(request: Request):
++        user = require(request)
++        return {k: user[k] for k in ('username', 'display_name', 'goals')}
++
++    @site.post('/api/profile')
++    async def save_profile(request: Request):
++        user = require(request)
++        csrf(request, request.headers.get('x-csrf-token'), user['csrf'])
++        body = await json_body(request)
++        try:
++            store.profile(user['id'], body.get('display_name'), body.get('goals'))
++        except ValueError as exc:
++            raise HTTPException(422, str(exc)) from None
++        return {'ok': True}
++
++    @site.get('/api/lessons')
++    def lessons(request: Request):
++        require(request)
++        return [{'id': p['id'], 'text': p['text'], 'hint': p.get('practice_tip', '')} for p in prompts]
++
++    @site.get('/api/suggestions')
++    def suggestions(request: Request):
++        user = require(request)
++        return {'phones': store.suggestions(user['id'], user['goals'])}
++
++    @site.get('/api/attempts')
++    def history(request: Request):
++        return {'attempts': store.history(require(request)['id'])}
++
++    @site.post('/api/attempts', status_code=202)
++    async def analyze(request: Request, prompt_id: str):
++        user = require(request)
++        csrf(request, request.headers.get('x-csrf-token'), user['csrf'])
++        if prompt_id not in catalog:
++            raise HTTPException(422, 'Choose an available practice sentence.')
++        if request.headers.get('content-type', '').split(';')[0] not in {'audio/wav', 'audio/x-wav'}:
++            raise HTTPException(415, 'Upload a WAV recording.')
++        audio = await read_body(request, MAX_AUDIO)
++        try:
++            info = sf.info(io.BytesIO(audio))
++            if info.format not in {'WAV', 'WAVEX'} or info.frames <= 0 or info.duration > 5 or info.channels > 2:
++                raise ValueError()
++            samples, _ = sf.read(io.BytesIO(audio))
++            if len(samples) != info.frames or not np.isfinite(samples).all():
++                raise ValueError()
++        except Exception:
++            raise HTTPException(422, 'Use a valid mono or stereo WAV recording, at most five seconds and 10 MB.') from None
++        if not jobs.slots.acquire(blocking=False):
++            raise HTTPException(503, 'The analysis queue is full. Please try again shortly.')
++        try:
++            identity = store.create_attempt(user['id'], catalog[prompt_id], audio)
++        except ValueError as exc:
++            jobs.slots.release()
++            raise HTTPException(409, str(exc)) from None
++        except Exception:
++            jobs.slots.release()
++            raise
++        try:
++            jobs.submit(user['id'], identity)
++        except Exception:
++            jobs.slots.release()
++            store.finish(user['id'], identity, error='Analysis could not start. Your recording is saved; try again.')
++            raise HTTPException(503, 'Analysis could not start; your recording is saved.') from None
++        return {'attempt_id': identity, 'status': 'queued'}
++
++    def own_attempt(request, identity, audio=False):
++        try:
++            return store.get_attempt(require(request)['id'], identity, audio=audio)
++        except LookupError:
++            raise HTTPException(404, 'Attempt not found.') from None
++
++    @site.get('/api/attempts/{identity}')
++    def get_attempt(request: Request, identity: str):
++        return own_attempt(request, identity)
++
++    @site.get('/api/attempts/{identity}/audio')
++    def get_audio(request: Request, identity: str):
++        data = own_attempt(request, identity, audio=True)['audio']
++        return Response(data, media_type='audio/wav', headers={'Content-Disposition': 'inline; filename="my-recording.wav"'})
++
++    @site.get('/api/attempts/{identity}/result')
++    def download_result(request: Request, identity: str):
++        result = own_attempt(request, identity)['result']
++        if result is None:
++            raise HTTPException(409, 'No analysis result is available yet.')
++        return JSONResponse(result, headers={'Content-Disposition': 'attachment; filename="my-analysis.json"'})
++
++    @site.delete('/api/attempts/{identity}')
++    def delete(request: Request, identity: str):
++        user = require(request)
++        csrf(request, request.headers.get('x-csrf-token'), user['csrf'])
++        try:
++            store.delete_attempt(user['id'], identity)
++        except LookupError:
++            raise HTTPException(404, 'Attempt not found.') from None
++        return {'ok': True}
++
++    return site
+diff --git a/analysis_service.py b/analysis_service.py
+index e1002ba..c7c2bf6 100644
+--- a/analysis_service.py
++++ b/analysis_service.py
+@@ -1,6 +1,7 @@
+ """One reusable CPU worker with a hard deadline and restart after failure.
+ 
+-Local single-user deployment only. The worker retains model caches across tries.
++Local single-server deployment. The private account site queues users through
++this worker, which retains model caches across tries.
+ Do not move a timed-out computation to an unbounded background thread.
+ """
+ import atexit
+@@ -21,10 +22,11 @@ def _worker(requests, responses):
+         request = requests.get()
+         if request is None:
+             return
+-        path, identity, compare_reference = request
++        path, identity, compare_reference = request[:3]
++        options = {"output_root": request[3]} if len(request) == 4 else {}
+         try:
+             result = run_attempt(path, identity, compare_reference=compare_reference,
+-                                 progress_callback=lambda message: responses.put(('progress', message)))
++                                 progress_callback=lambda message: responses.put(('progress', message)), **options)
+             responses.put(('result', result))
+         except Exception as exc:
+             responses.put(('error', f'{type(exc).__name__}: {exc}'))
+@@ -70,13 +72,13 @@ class AnalysisService:
+         self.process = context.Process(target=self.worker_target, args=(self.requests, self.responses), daemon=False)
+         self.process.start()
+ 
+-    def run(self, path, identity, *, compare_reference=False, progress_callback=None):
++    def run(self, path, identity, *, compare_reference=False, progress_callback=None, output_root=None):
+         if not self.lock.acquire(blocking=False):
+             raise RuntimeError('Another recording is being checked. Please wait and try again.')
+         try:
+             self._start()
+             deadline = time.monotonic() + self.timeout_sec
+-            self.requests.put((path, identity, compare_reference))
++            self.requests.put((path, identity, compare_reference) if output_root is None else (path, identity, compare_reference, str(output_root)))
+             while True:
+                 remaining = deadline - time.monotonic()
+                 if remaining <= 0:
+@@ -106,5 +108,5 @@ SERVICE = AnalysisService()
+ atexit.register(SERVICE.close)
+ 
+ 
+-def run_attempt(path, identity, *, compare_reference=False, progress_callback=None):
+-    return SERVICE.run(path, identity, compare_reference=compare_reference, progress_callback=progress_callback)
++def run_attempt(path, identity, *, compare_reference=False, progress_callback=None, output_root=None):
++    return SERVICE.run(path, identity, compare_reference=compare_reference, progress_callback=progress_callback, output_root=output_root)
+diff --git a/app_2.py b/app_2.py
+index 0e4c6e2..a3a4dc4 100644
+--- a/app_2.py
++++ b/app_2.py
+@@ -392,4 +392,4 @@ def build_app():
+ 
+ if __name__ == '__main__':
+     from site_server import serve
+-    serve(build_app(), practice_theme(), CSS)
++    serve()
+diff --git a/docs/ACCOUNTS_SETUP.md b/docs/ACCOUNTS_SETUP.md
+new file mode 100644
+index 0000000..200947f
+--- /dev/null
++++ b/docs/ACCOUNTS_SETUP.md
+@@ -0,0 +1,57 @@
++# Working local accounts, profiles, and saved practice
++
++This implementation supersedes the earlier unconnected Day 1 patch. It is built against branch `feature/profiles-personalization` at `8c4fa455621079da003134eb67b8d23080e00475`.
++
++## Start on your existing Windows installation
++
++Activate the same environment that already runs Accent Coach and work from the repository folder:
++
++```powershell
++python -m pip install -r requirements-accounts.txt
++python site_server.py
++```
++
++`python app_2.py` also starts the new account website. Open `http://127.0.0.1:7861/`. Stop the old app before restarting. Your existing MFA environment, downloaded models, and `phoneme_scoring/settings.local.json` still apply.
++
++1. Choose **Create an account**, enter a username, display name, and a password of at least 12 characters.
++2. Open **My profile**, choose preferred practice sounds, and save.
++3. In **Practice**, choose a sentence, record with the microphone or upload a WAV, then choose **Check and save my recording**.
++4. The recording is saved to your account before analysis starts. The result is saved when analysis finishes. Processing failure leaves the recording and failure status in history.
++5. Open **My history** to replay, download results, or delete an attempt. History remains after sign-out, app restart, and another user signing in.
++
++The speech pipeline is the existing preset pipeline. Custom-text/free-speech assessment and generated-example jobs remain the other teammates' integration work; this change does not invent those features or validated pronunciation scores.
++
++## Storage and privacy
++
++Local accounts use Argon2 password hashes, opaque revocable login cookies, CSRF checks, and SQLite transactions. Profile, history, recording playback, result downloads and deletion all use the verified login session to select the owner. There is no browser-supplied owner parameter. There is no external identity provider, API key or email verification requirement.
++
++The app stores accounts, recording blobs and results in ignored `private_data/accounts.sqlite3`, with temporary private analysis folders under `private_data/work/`. Set `ACCENT_COACH_DATA_DIR` to an absolute directory to relocate it. Keep the complete data directory if moving installations; stop the app before copying it. The database is local and not encrypted against someone with operating-system access.
++
++The server remains bound to localhost. Run one server per data directory. Account recovery/email delivery, public deployment, account deletion and automatic retention are outside this local milestone. Seven-day login sessions can be revoked by signing out. Attempt deletion removes its recording/result fields and prevents late completion from restoring them; backups/downloads are separate copies.
++
++Old unowned `runs/` files are left intact and are not assigned to whichever account signs up first. The legacy `app.py` and old history helper are not used by the new website. The private website does not mount Gradio's file server; all saved learner audio uses authenticated routes.
++
++## Integration changes
++
++- `accounts/store.py`: persistent accounts, profiles, login sessions and private attempts.
++- `accounts/web.py`: working sign-up/sign-in, profile, practice and history pages, authenticated APIs, bounded job queue.
++- `web_assets/accounts.js` / `.css`: browser UI, microphone WAV conversion, upload, polling, playback, profile saving and deletion.
++- `site_server.py`: mounts the account website and existing public/static pages.
++- `pipeline.py` / `analysis_service.py`: optional server-controlled `output_root` keeps new account jobs out of shared `runs/`; existing callers retain their default behavior.
++- `app_2.py`: existing launch command starts the account site.
++
++Attempts are immutable recordings: editing/replacing a recording starts a new attempt. A tombstoned attempt cannot be completed by a late worker. A restart marks interrupted jobs as failed while retaining the recording. A worker never takes output paths from browser input.
++
++## Verification
++
++```powershell
++python -m unittest discover -s tests -v
++```
++
++The full suite passed 86 tests in the implementation environment. New HTTP tests cover the complete registration/profile/upload/result/history/logout/login path, two-user access denial (including playback/download/delete), restart persistence, CSRF, bad audio, deletion during processing and analysis failure. Speech-worker substitution in those tests checks wiring; it does not measure model accuracy.
++
++A browser check also exercises the real server and pipeline; the final verification report records its result and the model-availability limitation of this environment.
++
++### Executed browser result
++
++Headless Chromium exercised account creation, WAV upload, simulated microphone capture and conversion, the actual worker/pipeline call, saving a profile, reopening history, signing out/back in, and a 390-pixel mobile viewport. It completed without JavaScript errors. The real pipeline returned partial/inconclusive feedback because Whisper/MFA/model assets are not installed in this test environment; recording and result persistence worked. This is not a human-pronunciation accuracy test. Physical microphone permission/device behavior should still be checked on the demo laptop.
+diff --git a/pipeline.py b/pipeline.py
+index a8cf8a3..00a197b 100644
+--- a/pipeline.py
++++ b/pipeline.py
+@@ -265,13 +265,13 @@ def _analyze(result, learner_path, prompt_id, run_dir, compare_reference=False,
+         result["overall_status"] = "partial"
+ 
+ 
+-def run_attempt(learner_path, prompt_id, *, compare_reference=False, progress_callback=None) -> dict:
++def run_attempt(learner_path, prompt_id, *, compare_reference=False, progress_callback=None, output_root=None) -> dict:
+     """Analyze one attempt; always return a fresh result and try to save its JSON."""
+     _report_progress(progress_callback, "Waiting for the recording check to start")
+     with _LOCK:  # Also protects reference cache and model calls across UI sessions.
+         attempt_started = time.monotonic()
+         run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S") + "_" + uuid.uuid4().hex[:12]
+-        run_dir = BASE_DIR / "runs" / run_id
++        run_dir = (Path(output_root) if output_root is not None else BASE_DIR / "runs") / run_id
+         result = {"schema_version": 3, "run_id": run_id, "prompt_id": prompt_id, "overall_status": "failed",
+                   "stage_statuses": {s: {"status": "skipped", "message": "Prerequisite unavailable."} for s in _STAGES},
+                   "audio_paths": {"original": None, "reference": None}, "learner_dsp": {},
+diff --git a/requirements-accounts.txt b/requirements-accounts.txt
+new file mode 100644
+index 0000000..26f4cec
+--- /dev/null
++++ b/requirements-accounts.txt
+@@ -0,0 +1,6 @@
++# Also install the project's existing requirements.txt for the speech pipeline.
++# No external account provider or API key is required for local sign-in.
++argon2-cffi==25.1.0
++fastapi==0.143.0
++uvicorn==0.54.0
++httpx==0.28.1
+diff --git a/site_pages.py b/site_pages.py
+index 369d257..12f95fd 100644
+--- a/site_pages.py
++++ b/site_pages.py
+@@ -48,7 +48,7 @@ def contact_links(config):
+ def header_html(current='/'):
+     config = load_site_config()
+     links = ''.join(f'<a href="{url}"' + (' aria-current="page"' if current == url else '') + f'>{label}</a>'
+-                    for url, label in [('/', 'Practice'), ('/help', 'How it works'), ('/privacy', 'Privacy')])
++                    for url, label in [('/', 'Practice'), ('/profile', 'My profile'), ('/history', 'My history'), ('/help', 'How it works'), ('/privacy', 'Privacy')])
+     return ('<a class="skip-link" href="#main-content">Skip to content</a><header class="site-header">'
+             f'<a class="site-brand" href="/" aria-label="{html.escape(config["brand"])} home">'
+             '<img src="/site-assets/favicon.svg" alt="" width="36" height="36">'
+@@ -91,11 +91,11 @@ def privacy_page():
+     contact = contact_links(config)
+     body = f'''<p class="eyebrow">Your recordings</p><h1>Privacy policy</h1>
+     <p class="intro">This notice covers the local Accent Coach prototype operated by {owner}.</p>
+-    <p><small>Updated October 11, 2026</small></p>
+-    <h2>What the app stores</h2><p>When you record or upload audio, the app processes your voice, the selected sentence, recognized words, sound measurements, analysis results, and processing messages. Completed attempts receive a timestamp and an identifier. Audio and results are saved on the computer running the app. In this local version, that is the demo computer.</p>
++    <p><small>Updated October 13, 2026</small></p>
++    <h2>What the app stores</h2><p>When you create an account, the app stores your username, display name, selected practice goals and an Argon2 password hash. Login sessions expire after seven days and are revoked on sign-out. When you record or upload audio, the app processes your voice, the selected sentence, recognized words, sound measurements, analysis results, and processing messages. Completed attempts receive a timestamp and an identifier. Audio and results are saved on the computer running the app. In this local version, that is the demo computer.</p>
+     <h2>How recordings are used</h2><p>The app uses recordings to check the selected sentence and produce experimental feedback about a practice sound. It does not use your attempts to train its models or identify who you are. Speech models run locally using previously downloaded files. No reference recording is needed.</p>
+-    <h2>Who can access them</h2><p>This is a single-user local application. People with access to the demo computer or its saved files may be able to hear recordings and read results. Saved history is not separated into private user accounts. Record only with the speaker's permission and avoid including sensitive information.</p>
+-    <h2>Storage and deletion</h2><p>Saved attempts stay on the demo computer until deleted. Open <strong>Saved attempts</strong>, choose a completed attempt, select the deletion confirmation, and press <strong>Delete selected attempt</strong>. This removes that attempt's saved folder and audio.</p><p>Temporary upload and playback copies may remain in the app's cache. Cache cleanup runs hourly and expires copies older than 24 hours while the app is running. Your browser may retain playback copies, preferences, or framework run history. Deleting an attempt does not immediately remove browser copies, downloaded files, or backups. Close old pages and clear browser data if needed. Incomplete attempts are not listed in history; contact the team for help removing them.</p>
++    <h2>Who can access them</h2><p>This local application separates saved history by signed-in account. Playback, downloads and deletion require the account that owns the attempt. People with operating-system access to the demo computer or its database may still be able to read saved data; the database is not encrypted. Record only with the speaker's permission and avoid including sensitive information.</p>
++    <h2>Storage and deletion</h2><p>Saved attempts stay on the demo computer until deleted. Open <strong>My history</strong>, open an attempt, and choose <strong>Delete this attempt</strong>, then confirm. This removes the recording and result from your account. A job finishing after deletion cannot restore the attempt.</p><p>Temporary analysis files are removed when processing finishes or on the next app start after an interruption. Your browser, downloaded files and backups may retain copies. Deletion is not a promise of forensic erasure from the disk. Accounts and history are stored locally in private_data; old unowned runs from the previous app are not assigned automatically.</p>
+     <h2>External services and links</h2><p>Gradio analytics are disabled for this app. The site uses local assets and system fonts. Initial model setup downloads files from model providers. Optional pronunciation lessons open third-party websites, which have their own privacy practices. Recordings are not sent to those lesson sites by this app.</p>
+     <h2>Questions or deletion help</h2><p>Contact {owner}: {contact}</p>
+     <p class="document-note">This notice describes the local prototype. A hosted service would have different access and storage arrangements, which must be reviewed and described before public launch.</p>'''
+@@ -106,7 +106,7 @@ def terms_page():
+     config = load_site_config()
+     body = f'''<p class="eyebrow">Using the prototype</p><h1>Terms &amp; Conditions</h1>
+     <p class="intro">Accent Coach is an English pronunciation practice prototype from {html.escape(config['owner'])}.</p>
+-    <p><small>Updated October 11, 2026</small></p>
++    <p><small>Updated October 13, 2026</small></p>
+     <h2>Purpose and limitations</h2><p>The app offers experimental feedback on selected English sound contrasts. Recognition, alignment, and sound comparisons may be incorrect or unavailable. Results are not validated pronunciation grades, language certifications, or a measure of a person's ability. Use them as practice guidance.</p>
+     <h2>Your recordings</h2><p>Submit only recordings you have permission to use. Obtain the speaker's permission before recording or uploading their voice. Do not upload private information about another person without their permission. You retain ownership of your recordings. The app processes and stores submitted audio to provide its practice features as described in the <a href="/privacy">privacy policy</a>.</p>
+     <h2>Appropriate use</h2><p>Use the app for pronunciation practice and evaluation of the prototype. Do not use it to harass speakers, impersonate others, gain access to another person's files, or disrupt the service. Do not use its experimental outputs for consequential decisions about people, including admission, employment, or certification.</p>
+diff --git a/site_server.py b/site_server.py
+index 4073b97..27fa322 100644
+--- a/site_server.py
++++ b/site_server.py
+@@ -1,5 +1,4 @@
+-"""Local website routes around the existing Gradio practice application."""
+-from contextlib import asynccontextmanager
++"""Local account website using the existing speech-analysis engine."""
+ import os
+ import socket
+ import threading
+@@ -7,26 +6,19 @@ import time
+ import urllib.request
+ import webbrowser
+ 
+-from fastapi import FastAPI, Request
++from fastapi import Request
+ from fastapi.responses import HTMLResponse, FileResponse, PlainTextResponse, JSONResponse
+ from starlette.exceptions import HTTPException
+ from starlette.middleware.gzip import GZipMiddleware
+ from starlette.staticfiles import StaticFiles
+-import gradio as gr
+ import uvicorn
+ 
+-from analysis_service import SERVICE
+-from site_pages import (ASSETS, ROOT, PRACTICE_DESCRIPTION, help_page, meta_html,
+-                        not_found_page, privacy_page, terms_page, stylesheet_html)
++from site_pages import ASSETS, help_page, not_found_page, privacy_page, terms_page
+ 
+ 
+-def create_site(demo, theme, css):
+-    @asynccontextmanager
+-    async def lifespan(app):
+-        yield
+-        SERVICE.close()
+-
+-    site = FastAPI(title='Accent Coach', docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
++def create_site(demo=None, theme=None, css=None, *, data_root=None, analyzer=None, prompts=None):
++    from accounts.web import private_site
++    site = private_site(data_root=data_root, analyzer=analyzer, prompts=prompts)
+     site.add_middleware(GZipMiddleware, minimum_size=1000)
+ 
+     @site.get('/help', response_class=HTMLResponse)
+@@ -54,28 +46,16 @@ def create_site(demo, theme, css):
+         return {'service': 'accent-coach', 'status': 'ready', 'public_launch': False}
+ 
+     site.mount('/site-assets', StaticFiles(directory=ASSETS), name='site-assets')
+-    site = gr.mount_gradio_app(site, demo.queue(default_concurrency_limit=1, max_size=8, api_open=False),
+-        path='/', server_name='127.0.0.1', server_port=int(os.environ.get('GRADIO_SERVER_PORT', '7861')),
+-        footer_links=[], favicon_path=str(ASSETS / 'favicon.ico'), max_file_size='10mb',
+-        allowed_paths=[str(ROOT / 'runs')], theme=theme,
+-        js=(ASSETS / 'practice.js').read_text(encoding='utf-8'),
+-        # A shared stylesheet avoids Gradio rewriting root/media selectors inside
+-        # each HTML component. The same rules also style standalone policy pages.
+-        head=meta_html(PRACTICE_DESCRIPTION) + stylesheet_html(), show_error=False,
+-        app_kwargs={'docs_url': None, 'redoc_url': None, 'openapi_url': None})
+-
+     async def not_found_handler(request: Request, exc: HTTPException):
+         if exc.status_code == 404 and 'text/html' in request.headers.get('accept', '') and not request.url.path.startswith('/gradio_api/'):
+             return HTMLResponse(not_found_page(), status_code=404)
+         return JSONResponse({'detail': exc.detail}, status_code=exc.status_code, headers=exc.headers)
+ 
+     site.add_exception_handler(HTTPException, not_found_handler)
+-    # The root mount owns unmatched paths, so it needs the HTML 404 handler too.
+-    site.routes[-1].app.add_exception_handler(HTTPException, not_found_handler)
+     return site
+ 
+ 
+-def serve(demo, theme, css):
++def serve(demo=None, theme=None, css=None):
+     port = int(os.environ.get('GRADIO_SERVER_PORT', '7861'))
+     with socket.socket() as probe:
+         if probe.connect_ex(('127.0.0.1', port)) == 0:
+@@ -95,3 +75,7 @@ def serve(demo, theme, css):
+         threading.Thread(target=open_when_ready, daemon=True).start()
+     print(f'Accent Coach: {address}', flush=True)
+     uvicorn.run(site, host='127.0.0.1', port=port, log_level='info')
++
++
++if __name__ == '__main__':
++    serve()
+diff --git a/tests/test_accounts_integration.py b/tests/test_accounts_integration.py
+new file mode 100644
+index 0000000..cda9bbd
+--- /dev/null
++++ b/tests/test_accounts_integration.py
+@@ -0,0 +1,166 @@
++"""Real HTTP account/storage flow with a deterministic speech-worker substitute.
++
++These tests verify application wiring, not neural-model pronunciation accuracy.
++"""
++import io
++import json
++from pathlib import Path
++import re
++import tempfile
++import threading
++import time
++import unittest
++import wave
++
++from fastapi.testclient import TestClient
++from site_server import create_site
++
++PROMPTS = [{'id': 'think', 'text': 'I think so', 'practice_tip': 'Practice TH.'}]
++
++
++def audio():
++    out = io.BytesIO()
++    with wave.open(out, 'wb') as wav:
++        wav.setnchannels(1); wav.setsampwidth(2); wav.setframerate(16000)
++        wav.writeframes(b'\x01\x00' * 1600)
++    return out.getvalue()
++
++
++def analyzer(path, prompt, **kwargs):
++    assert Path(path).read_bytes() == audio()
++    assert kwargs['compare_reference'] is False
++    assert Path(kwargs['output_root']).parent == Path(path).parent  # job-private output
++    kwargs['progress_callback']('Checking words')
++    return {'overall_status': 'partial', 'spoken_words_verification': {'transcript': 'I think so'},
++            'target_assessment': {'targets': [{'word': 'think', 'expected_phone': 'TH', 'status': 'alternative_favored'}]},
++            'results_path': '/secret/results.json', 'settings': {'command': '/private/tool'},
++            'stage_statuses': {'alignment': {'status': 'ok'}}}
++
++
++class AccountIntegrationTests(unittest.TestCase):
++    def setUp(self):
++        self.tmp = tempfile.TemporaryDirectory()
++        self.site = create_site(data_root=self.tmp.name, analyzer=analyzer, prompts=PROMPTS)
++        self.client = TestClient(self.site, base_url='http://localhost')
++        self.client.__enter__()
++
++    def tearDown(self):
++        self.client.__exit__(None, None, None)
++        self.tmp.cleanup()
++
++    def signup(self, client, name):
++        client.get('/signup')
++        response = client.post('/signup', data={'csrf': client.cookies['accent_login_csrf'], 'username': name,
++                            'password': 'test-password-123', 'display_name': name.title()})
++        self.assertEqual(response.status_code, 200, response.text)
++        self.assertIn('Practice English pronunciation.', response.text)
++        csrf = re.search(r'<meta name="csrf-token" content="([^"]+)"', response.text).group(1)
++        return {'X-CSRF-Token': csrf}
++
++    def attempt(self, client, headers):
++        response = client.post('/api/attempts?prompt_id=think', content=audio(), headers={**headers, 'Content-Type': 'audio/wav'})
++        self.assertEqual(response.status_code, 202, response.text)
++        identity = response.json()['attempt_id']
++        for _ in range(100):
++            result = client.get('/api/attempts/' + identity).json()
++            if result['status'] not in {'queued', 'processing'}:
++                return identity, result
++            time.sleep(.01)
++        self.fail('Analysis did not finish')
++
++    def test_signup_profile_analysis_history_playback_logout_login(self):
++        h = self.signup(self.client, 'alice')
++        self.assertIn('My profile', self.client.get('/profile').text)
++        self.assertEqual(self.client.post('/api/profile', json={'display_name': 'Alice Updated', 'goals': ['TH']}, headers=h).status_code, 200)
++        identity, result = self.attempt(self.client, h)
++        self.assertEqual(result['status'], 'completed')
++        self.assertEqual(result['result']['spoken_words_verification']['transcript'], 'I think so')
++        self.assertEqual(self.client.get(f'/api/attempts/{identity}/audio').content, audio())
++        self.assertEqual(self.client.get('/api/suggestions').json(), {'phones': ['TH']})
++        download = self.client.get(f'/api/attempts/{identity}/result')
++        self.assertNotIn('secret', download.text)
++        self.assertNotIn('settings', download.json())
++        self.assertEqual(len(self.client.get('/api/attempts').json()['attempts']), 1)
++        token = self.client.cookies['accent_session']
++        self.client.post('/logout', data={'csrf': h['X-CSRF-Token']})
++        self.assertEqual(self.client.get(f'/api/attempts/{identity}/audio').status_code, 401)
++        self.assertIsNone(self.site.state.store.session(token))
++        self.client.get('/login')
++        self.client.post('/login', data={'csrf': self.client.cookies['accent_login_csrf'], 'username': 'ALICE', 'password': 'test-password-123'})
++        self.assertEqual(self.client.get('/api/me').json()['display_name'], 'Alice Updated')
++        self.assertEqual(self.client.get(f'/api/attempts/{identity}/audio').content, audio())
++        with self.site.state.store.connect() as db:
++            hashed = db.execute('SELECT password FROM users').fetchone()[0]
++            self.assertTrue(hashed.startswith('$argon2id$'))
++
++    def test_second_user_cannot_read_play_download_or_delete_first_users_attempt(self):
++        ah = self.signup(self.client, 'alice')
++        identity, _ = self.attempt(self.client, ah)
++        bob = TestClient(self.site, base_url='http://localhost')
++        bh = self.signup(bob, 'bob')
++        self.assertEqual(bob.get('/api/attempts').json()['attempts'], [])
++        for suffix in ('', '/audio', '/result'):
++            self.assertEqual(bob.get('/api/attempts/' + identity + suffix).status_code, 404)
++        self.assertEqual(bob.delete('/api/attempts/' + identity, headers=bh).status_code, 404)
++        self.assertEqual(self.client.get('/api/attempts/' + identity).status_code, 200)
++        for path in ('/gradio_api/file=/tmp/anything', '/file=/tmp/anything', '/private_data/accounts.sqlite3', '/runs/example/learner.wav'):
++            self.assertEqual(bob.get(path).status_code, 404)
++
++    def test_restart_keeps_profile_audio_and_results(self):
++        h = self.signup(self.client, 'alice')
++        identity, _ = self.attempt(self.client, h)
++        app2 = create_site(data_root=self.tmp.name, analyzer=analyzer, prompts=PROMPTS)
++        with TestClient(app2, base_url='http://localhost') as client2:
++            client2.cookies.update(self.client.cookies)
++            self.assertEqual(client2.get('/api/me').json()['username'], 'alice')
++            self.assertEqual(client2.get(f'/api/attempts/{identity}/audio').content, audio())
++            self.assertEqual(client2.get(f'/api/attempts/{identity}/result').status_code, 200)
++
++    def test_csrf_credentials_and_invalid_audio_rejected(self):
++        self.client.get('/signup')
++        self.assertEqual(self.client.post('/signup', data={'username': 'alice', 'password': 'test-password-123', 'display_name': 'Alice'}).status_code, 403)
++        h = self.signup(self.client, 'alice')
++        self.assertEqual(self.client.post('/api/profile', json={'display_name': 'Other', 'goals': []}).status_code, 403)
++        self.assertEqual(self.client.post('/api/profile', headers={**h, 'Origin':'https://attacker.example'}, json={'display_name':'Other','goals':[]}).status_code, 403)
++        self.assertEqual(self.client.post('/api/attempts?prompt_id=think', headers={**h,'Content-Type':'audio/wav'}, content=b'bad').status_code, 422)
++        self.assertEqual(self.client.post('/api/attempts?prompt_id=unknown', headers={**h,'Content-Type':'audio/wav'}, content=audio()).status_code, 422)
++        self.assertEqual(self.client.get('/api/attempts').json()['attempts'], [])
++        self.client.get('/login')
++        response = self.client.post('/login', data={'csrf': self.client.cookies['accent_login_csrf'], 'username':'alice','password':'wrong-password'})
++        self.assertEqual(response.status_code, 401)
++
++    def test_delete_during_processing_rejects_late_result(self):
++        started, resume = threading.Event(), threading.Event()
++        def slow(*args, **kwargs):
++            started.set(); resume.wait(timeout=5)
++            return analyzer(*args, **kwargs)
++        self.site.state.jobs.analyzer = slow
++        h = self.signup(self.client, 'alice')
++        response = self.client.post('/api/attempts?prompt_id=think', content=audio(), headers={**h,'Content-Type':'audio/wav'})
++        identity = response.json()['attempt_id']
++        self.assertTrue(started.wait(timeout=5))
++        try:
++            self.assertEqual(self.client.delete('/api/attempts/' + identity, headers=h).status_code, 200)
++            self.assertEqual(self.client.get(f'/api/attempts/{identity}/audio').status_code, 404)
++        finally:
++            resume.set()
++        self.site.state.jobs.pool.submit(lambda: None).result(timeout=5)
++        self.assertEqual(self.client.get('/api/attempts/' + identity).status_code, 404)
++        with self.site.state.store.connect() as db:
++            row = db.execute('SELECT audio,result,deleted FROM attempts WHERE id=?', (identity,)).fetchone()
++            self.assertEqual(tuple(row), (None, None, 1))
++        self.assertEqual(list((Path(self.tmp.name) / 'work').iterdir()), [])
++
++    def test_analysis_failure_keeps_recording_and_stores_status(self):
++        def fail(*args, **kwargs):
++            raise TimeoutError('test timeout')
++        self.site.state.jobs.analyzer = fail
++        h = self.signup(self.client, 'alice')
++        identity, result = self.attempt(self.client, h)
++        self.assertEqual(result['status'], 'failed')
++        self.assertEqual(self.client.get(f'/api/attempts/{identity}/audio').content, audio())
++        self.assertEqual(self.client.get(f'/api/attempts/{identity}/result').status_code, 409)
++
++
++if __name__ == '__main__':
++    unittest.main()
+diff --git a/tests/test_site.py b/tests/test_site.py
+index b9d9f11..a02ac8d 100644
+--- a/tests/test_site.py
++++ b/tests/test_site.py
+@@ -2,6 +2,7 @@
+ from html.parser import HTMLParser
+ import json
+ import unittest
++import tempfile
+ from unittest.mock import patch
+ 
+ from fastapi.testclient import TestClient
+@@ -26,14 +27,14 @@ class Links(HTMLParser):
+ class WebsiteTests(unittest.TestCase):
+     @classmethod
+     def setUpClass(cls):
+-        cls.demo = app_2.build_app()
+-        cls.client = TestClient(create_site(cls.demo, app_2.practice_theme(), app_2.CSS))
++        cls.temp = tempfile.TemporaryDirectory()
++        cls.client = TestClient(create_site(data_root=cls.temp.name), base_url='http://localhost')
+         cls.client.__enter__()
+ 
+     @classmethod
+     def tearDownClass(cls):
+         cls.client.__exit__(None, None, None)
+-        cls.demo.close()
++        cls.temp.cleanup()
+ 
+     def test_pages_have_titles_descriptions_contact_and_working_local_links(self):
+         titles = set()
+@@ -75,13 +76,13 @@ class WebsiteTests(unittest.TestCase):
+         self.assertEqual(css.headers.get('content-encoding'), 'gzip')
+         self.assertIn('prefers-reduced-motion', css.text)
+ 
+-    def test_app_has_custom_metadata_and_no_builder_footer(self):
++    def test_root_requires_sign_in_and_private_pages_redirect(self):
+         response = self.client.get('/')
+         self.assertEqual(response.status_code, 200)
+-        self.assertIn('English pronunciation practice | Accent Coach', response.text)
+-        self.assertFalse(self.demo.analytics_enabled)
+-        self.assertEqual(self.demo.footer_links, [])
+-        self.assertIn('name="description"', self.demo.head)
++        self.assertIn('Sign in | Accent Coach', response.text)
++        self.assertIn('name="description"', response.text)
++        for path in ('/practice', '/profile', '/history'):
++            self.assertEqual(self.client.get(path, follow_redirects=False).headers['location'], '/login')
+         self.assertEqual(self.client.get('/robots.txt').text, 'User-agent: *\nDisallow: /\n')
+ 
+     def test_contact_links_are_explicit_and_phone_is_optional(self):
+diff --git a/web_assets/accounts.css b/web_assets/accounts.css
+new file mode 100644
+index 0000000..bbef0a7
+--- /dev/null
++++ b/web_assets/accounts.css
+@@ -0,0 +1 @@
++.account-nav{display:flex;gap:1rem;flex-wrap:wrap;align-items:center;border-bottom:1px solid #d3ddd7;padding:0 0 1rem;margin-bottom:2rem}.account-nav form{display:inline}.account-nav span{margin-left:auto;font-size:.9rem}.account-card{padding:1.5rem;margin:1.5rem 0;border:1px solid #d3ddd7;border-radius:16px;background:white;overflow-wrap:anywhere}.account-form{display:grid;gap:1rem;max-width:480px}.account-form label{display:grid;gap:.4rem}input:not([type=checkbox]),select{display:block;padding:.7rem;border:1px solid #b6c7be;border-radius:8px;font:inherit;max-width:100%;box-sizing:border-box}button{padding:.65rem 1rem;border:1px solid #b6c7be;border-radius:8px;background:#fff;color:#192b30;font:inherit;cursor:pointer}button.primary{background:#11675b;color:white;margin-top:1rem}button:disabled{opacity:.5;cursor:default}.record-actions{display:flex;gap:1rem;margin:1rem 0}.account-card audio{display:block;width:100%;max-width:520px;margin:1rem 0}.account-card pre{white-space:pre-wrap;max-height:350px;overflow:auto}.account-card .danger{display:block;margin-top:1.5rem;color:#8e2630}.form-error{color:#8e2630}.account-form .goal{display:inline-flex;align-items:center;margin-right:1rem}.account-card details{margin:1rem 0}.account-card [hidden]{display:none}a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #11675b;outline-offset:3px}@media(max-width:600px){.account-nav span{margin-left:0;width:100%}.account-card{padding:1rem}}
+diff --git a/web_assets/accounts.js b/web_assets/accounts.js
+new file mode 100644
+index 0000000..21ff5db
+--- /dev/null
++++ b/web_assets/accounts.js
+@@ -0,0 +1,187 @@
++'use strict';
++const $ = id => document.getElementById(id);
++const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
++async function api(url, options = {}) {
++  const response = await fetch(url, {...options, headers: {'X-CSRF-Token': csrf || '', ...(options.headers || {})}});
++  if (response.status === 401) { window.location.assign('/login'); throw Error('Sign in to continue.'); }
++  const data = await response.json();
++  if (!response.ok) throw Error(data.detail || 'Something went wrong. Please try again.');
++  return data;
++}
++function element(tag, text, className) {
++  const node = document.createElement(tag);
++  if (text !== undefined) node.textContent = text;
++  if (className) node.className = className;
++  return node;
++}
++let shownAttempt = null;
++let pollTimer = null;
++async function showAttempt(id) {
++  clearTimeout(pollTimer);
++  shownAttempt = id;
++  const attempt = await api('/api/attempts/' + encodeURIComponent(id));
++  if (shownAttempt !== id) return;
++  const panel = $('attempt-result');
++  panel.hidden = false;
++  panel.replaceChildren(element('h2', attempt.sentence), element('p', attempt.message));
++  const audio = element('audio');
++  audio.controls = true;
++  audio.src = '/api/attempts/' + encodeURIComponent(id) + '/audio';
++  panel.append(audio);
++  if (attempt.result) {
++    const result = attempt.result;
++    panel.append(element('p', 'Recognized words: ' + (result.spoken_words_verification?.transcript || 'Unavailable')));
++    const targets = result.target_assessment?.targets || [];
++    const labels = {
++      expected_supported: 'The model favors the expected sound.',
++      alternative_favored: 'Possible substitution: try practicing this sound.',
++      insufficient_evidence: 'Inconclusive: there is not enough evidence to judge this sound.'
++    };
++    for (const target of targets) {
++      panel.append(element('p', `${target.word} /${target.expected_phone}/ — ${labels[target.status] || 'Inconclusive.'}`));
++    }
++    if (!targets.length) panel.append(element('p', 'Sound feedback is unavailable for this attempt.'));
++    panel.append(element('p', 'Experimental feedback, not a pronunciation grade.'));
++    const details = element('details');
++    details.append(element('summary', 'Processing details'), element('pre', JSON.stringify(result.stage_statuses || {}, null, 2)));
++    const download = element('a', 'Download my analysis');
++    download.href = '/api/attempts/' + encodeURIComponent(id) + '/result';
++    download.download = 'my-analysis.json';
++    panel.append(details, download);
++  }
++  const remove = element('button', 'Delete this attempt', 'danger');
++  remove.addEventListener('click', async () => {
++    if (!window.confirm('Delete this saved recording and its results?')) return;
++    try {
++      await api('/api/attempts/' + encodeURIComponent(id), {method: 'DELETE'});
++      clearTimeout(pollTimer);
++      shownAttempt = null;
++      audio.pause(); audio.removeAttribute('src'); audio.load();
++      panel.hidden = true; panel.replaceChildren();
++      if ($('history-list')) await history();
++      if ($('practice-status')) $('practice-status').textContent = 'Attempt deleted.';
++    } catch (error) { panel.append(element('p', error.message, 'form-error')); }
++  });
++  panel.append(remove);
++  if (['queued', 'processing'].includes(attempt.status)) {
++    pollTimer = setTimeout(() => showAttempt(id).catch(error => {
++      panel.append(element('p', error.message, 'form-error'));
++    }), 1500);
++  } else if ($('suggestions')) {
++    await suggestions();
++  }
++}
++async function history() {
++  const {attempts} = await api('/api/attempts');
++  const list = $('history-list');
++  list.replaceChildren();
++  $('history-status').textContent = attempts.length ? 'Choose an attempt to listen and review.' : 'No saved attempts yet. Go to Practice to make your first recording.';
++  for (const attempt of attempts) {
++    const card = element('article', undefined, 'account-card');
++    card.append(element('h2', attempt.sentence), element('p', new Date(attempt.created * 1000).toLocaleString() + ' · ' + attempt.status));
++    const button = element('button', 'Open recording and results');
++    button.addEventListener('click', () => showAttempt(attempt.id).catch(error => {$('history-status').textContent = error.message;}));
++    card.append(button); list.append(card);
++  }
++}
++async function suggestions() {
++  const {phones} = await api('/api/suggestions');
++  $('suggestions').textContent = phones.length ? 'Based on possible substitutions in recent attempts, try: ' + phones.join(', ') + '. These suggestions do not establish errors or improvement.' : 'No practice-specific findings yet. Choose a sentence or set your preferred sounds in My profile.';
++}
++if ($('profile-form')) $('profile-form').addEventListener('submit', async event => {
++  event.preventDefault();
++  try {
++    await api('/api/profile', {method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({display_name: $('display-name').value, goals: [...document.querySelectorAll('input[name="goal"]:checked')].map(n => n.value)})});
++    $('profile-status').textContent = 'Profile saved. Your goals will guide practice suggestions.';
++  } catch (error) { $('profile-status').textContent = error.message; }
++});
++if ($('history-list')) history().catch(error => {$('history-status').textContent = error.message;});
++if ($('lesson')) {
++  let wav = null, previewUrl = null, recorder = null, stream = null, stopTimer = null, lessons = [];
++  function acceptRecording(blob) {
++    wav = blob;
++    if (previewUrl) URL.revokeObjectURL(previewUrl);
++    previewUrl = URL.createObjectURL(blob);
++    $('preview').src = previewUrl; $('preview').hidden = false;
++    $('analyze').disabled = false;
++    $('practice-status').textContent = 'Recording ready. Listen, then check and save it.';
++  }
++  function stopMicrophone() {
++    if (recorder?.state === 'recording') recorder.stop();
++    clearTimeout(stopTimer);
++    stream?.getTracks().forEach(track => track.stop());
++    $('stop').disabled = true;
++  }
++  $('recording-file').addEventListener('change', event => {
++    const file = event.target.files[0];
++    if (!file) return;
++    if (file.size > 10 * 1024 * 1024) { $('practice-status').textContent = 'Use a WAV file under 10 MB.'; return; }
++    acceptRecording(file);
++  });
++  $('record').addEventListener('click', async () => {
++    try {
++      $('record').disabled = true; $('analyze').disabled = true;
++      $('lesson').disabled = true; $('recording-file').disabled = true; $('recording-file').value = '';
++      stream = await navigator.mediaDevices.getUserMedia({audio: true});
++      const chunks = [];
++      recorder = new MediaRecorder(stream);
++      recorder.addEventListener('dataavailable', e => { if (e.data.size) chunks.push(e.data); });
++      recorder.addEventListener('stop', async () => {
++        try {
++          const context = new AudioContext();
++          try {
++            const decoded = await context.decodeAudioData(await new Blob(chunks).arrayBuffer());
++            // Encode mono PCM WAV locally. Cap recorder startup/stop padding at 5 seconds.
++            const frames = Math.min(decoded.length, Math.floor(decoded.sampleRate * 5));
++            const buffer = new ArrayBuffer(44 + frames * 2), view = new DataView(buffer);
++            const str = (offset, text) => [...text].forEach((c, i) => view.setUint8(offset + i, c.charCodeAt(0)));
++            str(0, 'RIFF'); view.setUint32(4, 36 + frames * 2, true); str(8, 'WAVE'); str(12, 'fmt ');
++            view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
++            view.setUint32(24, decoded.sampleRate, true); view.setUint32(28, decoded.sampleRate * 2, true);
++            view.setUint16(32, 2, true); view.setUint16(34, 16, true); str(36, 'data'); view.setUint32(40, frames * 2, true);
++            const channels = Array.from({length: decoded.numberOfChannels}, (_, c) => decoded.getChannelData(c));
++            for (let i = 0; i < frames; i++) {
++              const sample = Math.max(-1, Math.min(1, channels.reduce((sum, c) => sum + c[i], 0) / channels.length));
++              view.setInt16(44 + i * 2, sample < 0 ? sample * 32768 : sample * 32767, true);
++            }
++            acceptRecording(new Blob([buffer], {type: 'audio/wav'}));
++          } finally { await context.close(); }
++        } catch (error) { $('practice-status').textContent = 'Could not read microphone audio. Try uploading a WAV file.'; }
++        finally { $('record').disabled = false; $('lesson').disabled = false; $('recording-file').disabled = false; }
++      });
++      recorder.start(); $('stop').disabled = false;
++      $('practice-status').textContent = 'Recording… Say the sentence. Recording stops after five seconds.';
++      stopTimer = setTimeout(stopMicrophone, 4900);
++    } catch (error) {
++      stopMicrophone(); $('record').disabled = false; $('lesson').disabled = false; $('recording-file').disabled = false;
++      $('practice-status').textContent = 'Microphone access was unavailable. Allow microphone access or upload a WAV file.';
++    }
++  });
++  $('stop').addEventListener('click', stopMicrophone);
++  $('analyze').addEventListener('click', async () => {
++    if (!wav) return;
++    $('analyze').disabled = true;
++    $('practice-status').textContent = 'Saving your recording…';
++    clearTimeout(pollTimer); shownAttempt = null;
++    $('attempt-result').hidden = true; $('attempt-result').replaceChildren();
++    try {
++      const result = await api('/api/attempts?prompt_id=' + encodeURIComponent($('lesson').value), {method: 'POST', headers: {'Content-Type': 'audio/wav'}, body: wav});
++      $('practice-status').textContent = 'Recording saved to your account. You can follow analysis here or in My history.';
++      await showAttempt(result.attempt_id);
++    } catch (error) { $('practice-status').textContent = error.message; }
++    finally { $('analyze').disabled = false; }
++  });
++  function selectLesson() {
++    const lesson = lessons.find(p => p.id === $('lesson').value);
++    $('lesson-hint').textContent = lesson?.hint || '';
++    $('example').src = '/site-assets/examples/' + encodeURIComponent($('lesson').value) + '.wav';
++  }
++  $('lesson').addEventListener('change', () => {
++    wav = null; $('preview').hidden = true; $('preview').removeAttribute('src'); $('preview').load(); $('recording-file').value = ''; $('analyze').disabled = true;
++    if (previewUrl) { URL.revokeObjectURL(previewUrl); previewUrl = null; }
++    selectLesson(); $('practice-status').textContent = 'Record the new sentence before checking.';
++  });
++  api('/api/lessons').then(data => {lessons = data; selectLesson();}).catch(error => {$('practice-status').textContent = error.message;});
++  suggestions().catch(() => {});
++  window.addEventListener('pagehide', () => {stopMicrophone(); if (previewUrl) URL.revokeObjectURL(previewUrl);});
++}
+-- 
+2.51.1
+

@@ -392,4 +392,4 @@ def build_app():
 
 if __name__ == '__main__':
     from site_server import serve
-    serve(build_app(), practice_theme(), CSS)
+    serve()

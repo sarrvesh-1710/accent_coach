@@ -52,6 +52,7 @@ class ConfirmedAnalysisTests(unittest.TestCase):
         dictionary.write_text("think TH IH1 NG K\nso S OW1\n")
         self.settings = load_settings(Path(__file__).parents[1] / "phoneme_scoring/settings.json")
         self.settings["mfa"]["dictionary"] = str(dictionary)
+        self.settings['content_check'].update(model_id='fixture', revision='fixture-rev')
         digest = hashlib.sha256(self.path.read_bytes()).hexdigest()
         self.fingerprint = prepare_audio(self.path, self.settings)[2]
         self.snapshot = dict(attempt_id="attempt-1", job_id="job-1", input_revision=2,
@@ -143,7 +144,7 @@ class ConfirmedAnalysisTests(unittest.TestCase):
         self.align.assert_not_called()
 
     def test_asr_disagreement_and_missing_provenance_abstain(self):
-        for change in ({"recognized_text": "so"}, {"status": "failed"}, {"audio_sha256": "wrong"}, {"model_revision": None}):
+        for change in ({"recognized_text": "so"}, {"status": "failed"}, {"audio_sha256": "wrong"}, {"model_revision": None}, {'model_revision':'old'}, {'model_id':'wrong'}):
             original = deepcopy(self.snapshot["transcription"])
             self.snapshot["transcription"].update(change)
             r = self.run_worker()

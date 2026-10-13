@@ -1,0 +1,7 @@
+{
+  "ok": true,
+  "attempt_id": "demo-attempt-001",
+  "input_revision": 1,
+  "job_id": "demo-generation-job-001",
+  "status": "queued"
+}

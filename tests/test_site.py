@@ -2,6 +2,7 @@
 from html.parser import HTMLParser
 import json
 import unittest
+import tempfile
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
@@ -26,14 +27,14 @@ class Links(HTMLParser):
 class WebsiteTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.demo = app_2.build_app()
-        cls.client = TestClient(create_site(cls.demo, app_2.practice_theme(), app_2.CSS))
+        cls.temp = tempfile.TemporaryDirectory()
+        cls.client = TestClient(create_site(data_root=cls.temp.name), base_url='http://localhost')
         cls.client.__enter__()
 
     @classmethod
     def tearDownClass(cls):
         cls.client.__exit__(None, None, None)
-        cls.demo.close()
+        cls.temp.cleanup()
 
     def test_pages_have_titles_descriptions_contact_and_working_local_links(self):
         titles = set()
@@ -75,13 +76,13 @@ class WebsiteTests(unittest.TestCase):
         self.assertEqual(css.headers.get('content-encoding'), 'gzip')
         self.assertIn('prefers-reduced-motion', css.text)
 
-    def test_app_has_custom_metadata_and_no_builder_footer(self):
+    def test_root_requires_sign_in_and_private_pages_redirect(self):
         response = self.client.get('/')
         self.assertEqual(response.status_code, 200)
-        self.assertIn('English pronunciation practice | Accent Coach', response.text)
-        self.assertFalse(self.demo.analytics_enabled)
-        self.assertEqual(self.demo.footer_links, [])
-        self.assertIn('name="description"', self.demo.head)
+        self.assertIn('Sign in | Accent Coach', response.text)
+        self.assertIn('name="description"', response.text)
+        for path in ('/practice', '/profile', '/history'):
+            self.assertEqual(self.client.get(path, follow_redirects=False).headers['location'], '/login')
         self.assertEqual(self.client.get('/robots.txt').text, 'User-agent: *\nDisallow: /\n')
 
     def test_contact_links_are_explicit_and_phone_is_optional(self):

@@ -1,0 +1,7 @@
+# Also install the project's existing requirements.txt for the speech pipeline.
+# No external account provider or API key is required for local sign-in.
+argon2-cffi==25.1.0
+argon2-cffi-bindings==26.1.0
+fastapi==0.143.0
+uvicorn==0.54.0
+httpx==0.28.1

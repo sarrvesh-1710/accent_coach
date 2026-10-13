@@ -223,3 +223,6 @@ __marimo__/
 phoneme_scoring/settings.local.json
 phoneme_scoring/runs/
 phoneme_scoring/L2-ARCTIC/
+
+# Private account database, recording blobs, and temporary analysis files
+/private_data/

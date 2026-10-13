@@ -1,0 +1,6 @@
+kokoro==0.9.4
+misaki[en]==0.9.4
+transformers==4.57.6
+huggingface-hub==0.36.2
+soundfile==0.14.0
+# Fully resolved experiment environment is recorded in requirements-kokoro-lock.txt.

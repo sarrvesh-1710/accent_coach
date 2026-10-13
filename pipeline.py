@@ -265,13 +265,13 @@ def _analyze(result, learner_path, prompt_id, run_dir, compare_reference=False, 
         result["overall_status"] = "partial"
 
 
-def run_attempt(learner_path, prompt_id, *, compare_reference=False, progress_callback=None) -> dict:
+def run_attempt(learner_path, prompt_id, *, compare_reference=False, progress_callback=None, output_root=None) -> dict:
     """Analyze one attempt; always return a fresh result and try to save its JSON."""
     _report_progress(progress_callback, "Waiting for the recording check to start")
     with _LOCK:  # Also protects reference cache and model calls across UI sessions.
         attempt_started = time.monotonic()
         run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S") + "_" + uuid.uuid4().hex[:12]
-        run_dir = BASE_DIR / "runs" / run_id
+        run_dir = (Path(output_root) if output_root is not None else BASE_DIR / "runs") / run_id
         result = {"schema_version": 3, "run_id": run_id, "prompt_id": prompt_id, "overall_status": "failed",
                   "stage_statuses": {s: {"status": "skipped", "message": "Prerequisite unavailable."} for s in _STAGES},
                   "audio_paths": {"original": None, "reference": None}, "learner_dsp": {},

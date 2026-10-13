@@ -121,8 +121,10 @@ def run_confirmed_attempt(snapshot, settings):
             result["audio_sha256"] = fingerprint
             asr = snapshot.get("transcription") or {}
             recognized = prepare_transcript(asr.get("recognized_text"), settings)
+            model_cfg = settings.get("content_check", {})
             content_match = (asr.get("status") == "completed" and asr.get("source_audio_sha256") == result["source_audio_sha256"]
-                             and asr.get("audio_sha256") == fingerprint and bool(asr.get("model_id")) and bool(asr.get("model_revision"))
+                             and asr.get("audio_sha256") == fingerprint and asr.get("model_id") == model_cfg.get("model_id")
+                             and asr.get("model_revision") == model_cfg.get("revision") and bool(asr.get("model_revision"))
                              and recognized["ok"] and recognized["normalized_text"] == prepared["normalized_text"])
             result["transcription_provenance"] = {k: asr.get(k) for k in
                 ("status", "recognized_text", "source_audio_sha256", "audio_sha256", "model_id", "model_revision")}
@@ -167,9 +169,12 @@ def run_confirmed_attempt(snapshot, settings):
                 result["limitations"].append("CONTENT_UNVERIFIED: confirmed text was aligned for diagnostics only.")
             result["limitations"].append("Experimental sound evidence, not a pronunciation grade or confirmed error.")
             result.update(ok=True, analysis_status="completed")
-            return json_safe(result)
+            return result
     except Exception:
         return fail("MODEL_UNAVAILABLE", "Analysis inputs or model output could not be processed; check configuration and retry.")
+    finally:
+        if 'started' in locals():
+            result['timings'].setdefault('analysis', {})['processing_ms'] = (time.monotonic()-started)*1000
 
 
 def execute_confirmed_analysis(auth, attempt_id, job_id, input_revision, *, store: AnalysisStore, settings):

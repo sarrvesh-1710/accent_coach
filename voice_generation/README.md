@@ -47,3 +47,7 @@ See `FEASIBILITY.md` for the conversion investigation and next model experiment.
 ## Kokoro comparison
 
 See [the Kokoro timing and listening runbook](KOKORO_RUNBOOK.md) for the neural backend, cold/warm measurements and review form.
+
+## Day 2 playback component
+
+Run the isolated Hear an example demo on localhost:8762. See [Day 2 launch and integration instructions](DAY2_RUNBOOK.md).

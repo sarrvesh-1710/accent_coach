@@ -1,0 +1,8 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Hear an example · Accent Coach</title><link rel="stylesheet" href="/panel.css"><script defer src="/panel.js"></script></head>
+<body><main><p class="eyebrow">Accent Coach · Day 2 component demo</p><h1>Hear an example</h1><p>Review your text, confirm it, then hear a synthetic American English example.</p>
+<section aria-labelledby="text-title"><h2 id="text-title">Your text</h2><label for="text">Words to hear</label><textarea id="text" maxlength="1000" rows="4">I think so.</textarea><label for="accent">Target accent</label><select id="accent"><option value="en-US-general-american">General American</option></select><button id="confirm">Confirm text</button><p id="confirmation" aria-live="polite">Confirm the words before generating.</p></section>
+<section class="example-panel" aria-labelledby="example-title"><h2 id="example-title">Hear an example</h2><p class="badge">Synthetic example</p><p>Target accent: General American</p><button id="generate" disabled>Generate example</button><p id="status" role="status" aria-live="polite">Confirm your text to begin.</p><audio id="audio" controls hidden aria-label="Play synthetic example"></audio><p id="timing" class="muted"></p><p class="muted">This is a synthetic voice. It does not preserve your voice or assess your pronunciation.</p></section>
+<p class="muted">This local demo uses a temporary development session. Your generation component is separate from pronunciation feedback.</p><button id="delete" class="secondary">Delete this demo session</button><p id="deletion" aria-live="polite"></p>
+</main></body></html>

@@ -43,3 +43,7 @@ The eventual UI must say **Synthetic example**, and generation failure must leav
 completed assessment visible. Do not pass generated files into the learner pipeline.
 
 See `FEASIBILITY.md` for the conversion investigation and next model experiment.
+
+## Kokoro comparison
+
+See [the Kokoro timing and listening runbook](KOKORO_RUNBOOK.md) for the neural backend, cold/warm measurements and review form.

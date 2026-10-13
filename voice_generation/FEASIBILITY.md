@@ -6,8 +6,7 @@ generation plumbing; a listener must still confirm words and practice sounds.
 [Microsoft WAV output API](https://learn.microsoft.com/en-us/dotnet/api/system.speech.synthesis.speechsynthesizer.setoutputtowavefile?view=netframework-4.8.1).
 
 For a neural synthetic-example follow-up, Kokoro-82M exposes American English
-voices and Apache-2.0 model licensing. It has not been installed or benchmarked
-in this starter. Keep any new dependencies in this module's environment.
+voices and Apache-2.0 model licensing. The isolated backend is now installed; its repeatable benchmark and listening review are described in KOKORO_RUNBOOK.md. Keep any new dependencies in this module's environment.
 [Kokoro model card](https://huggingface.co/hexgrad/Kokoro-82M).
 
 Conversion candidate: **Seed-VC v2**. Its source documentation offers accent/style

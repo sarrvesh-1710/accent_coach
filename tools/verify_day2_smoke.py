@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import types
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -59,7 +60,7 @@ def main():
     baseline.__package__ = "phoneme_scoring"
     old_alignment = subprocess.check_output(["git", "show", "HEAD:phoneme_scoring/align_audio.py"], cwd=ROOT, text=True)
     exec(compile(old_alignment, "baseline_align_audio", "exec"), baseline.__dict__)
-    with tempfile.TemporaryDirectory(prefix="accent_day2_smoke_") as work:
+    with tempfile.TemporaryDirectory(prefix="accent_day2_smoke_") as work, patch.dict(os.environ,settings.get('mfa',{}).get('environment',{})):
         old = baseline.align_audio(source, prompt["text"], settings, work)
         aligned = current["alignment"]
         keys = ["status", "segments", "words", "audio_sha256", "duration_sec", "sample_rate_hz", "boundary_rounding_corrections"]

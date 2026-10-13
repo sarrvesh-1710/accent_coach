@@ -113,6 +113,8 @@ Coordinate changes to app_2.py, pipeline.py, site_server.py, shared CSS/JS, requ
 
 ## 9. Unresolved decisions for team review
 
+October 13 integration note: `accounts.practice_jobs.PracticeJobs` now supplies the agreed method names for custom/free sessions over Lucas-derived SQLite/account storage. HTTP `/api/sessions` snapshots use the flat fields above. Auth is an opaque login-session token revalidated in storage, never a browser user ID. This integration is local and awaiting commit/team review; earlier design-only status describes the original baseline. Internal domain exceptions are converted to the public error envelope by the HTTP adapter. Preset routes remain compatible with the prior account patch. See `INTEGRATION_COMPLETION_REPORT.md` for actual tests and limits.
+
 - Lucas: authentication library/provider, persistent store, deployment destination and legacy local-history migration. Do not automatically assign existing recordings to a new user.
 - Sarrvesh + Lucas: exact normalization/tokenization, word indexing and MFA contraction reconciliation. The conservative ASR-disagreement policy above is accepted; a more permissive acoustic-consistency method needs evaluation.
 - Sarrvesh: implement dictionary preflight and occurrence targeting under the accepted scope. Expanding duration, contrasts or vocabulary fallbacks requires a later decision.

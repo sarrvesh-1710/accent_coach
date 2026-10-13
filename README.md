@@ -1,3 +1,20 @@
+# Local account website: October 13, 2026
+
+Local integration now includes custom text and free speech with explicit transcript confirmation, private revision-aware sessions, and separate synthetic playback. See [the integration report](docs/INTEGRATION_COMPLETION_REPORT.md) for verification, setup limits and remaining work. Preset lessons remain available. The local Windows speech backend works; the isolated Kokoro runtime is optional and is not installed by the main account requirements.
+
+The website now has real local sign-up/sign-in, **My profile**, and **My history**. New recordings and analysis results are stored under the signed-in account and remain after restarting the app.
+
+From your existing project environment:
+
+```powershell
+python -m pip install -r requirements-accounts.txt
+python site_server.py
+```
+
+Open `http://127.0.0.1:7861/` and create an account. `python app_2.py` starts the same new site. Models/MFA still use your existing configuration. See [account setup and verification](docs/ACCOUNTS_SETUP.md). This integrated version supersedes the earlier standalone Day 1 patch. Old unowned `runs/` history is preserved separately.
+
+The older release notes below describe previous versions. The October 13 account setup above is the current launch path.
+
 # accent_coach
 
 ## Parallel team work: October 12, 2026

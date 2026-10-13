@@ -98,6 +98,15 @@ class MFATimingTests(unittest.TestCase):
         r = mfa.align_audio("fixture.wav", "", self.settings, self.temp.name)
         self.assertEqual(r["timings_sec"], {"total": 2})
 
+    def test_explicit_environment_is_child_only(self):
+        import os
+        previous=os.environ.get('ACCENT_TIMING_TEST')
+        self.settings['mfa']['environment']={'ACCENT_TIMING_TEST':'child'}
+        result=self.call()
+        self.assertEqual(result['status'],'available')
+        self.assertEqual(self.process.call_args.kwargs['env']['ACCENT_TIMING_TEST'],'child')
+        self.assertEqual(os.environ.get('ACCENT_TIMING_TEST'),previous)
+
 
 if __name__ == "__main__":
     unittest.main()

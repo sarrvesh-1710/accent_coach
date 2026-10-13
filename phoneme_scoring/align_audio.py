@@ -222,9 +222,10 @@ def attach_words(segments, tiers, duration):
     return words
 
 
-def run_mfa(args, *, stdout, stderr, timeout, check=False, creationflags=0):
+def run_mfa(args, *, stdout, stderr, timeout, check=False, creationflags=0, env=None):
     """Kill the owned process tree on timeout, before releasing the MFA lock."""
-    process = subprocess.Popen(args, stdout=stdout, stderr=stderr, creationflags=creationflags)
+    process = subprocess.Popen(args, stdout=stdout, stderr=stderr, creationflags=creationflags,
+                               **({'env':env} if env is not None else {}))
     try:
         code = process.wait(timeout=timeout)
         return subprocess.CompletedProcess(args, code)
@@ -280,11 +281,17 @@ def align_audio(audio, transcript, settings, run_dir) -> dict:
             with alignment_lock(Path.home() / '.accent_coach' / 'mfa.lock'):
                 timings["lock_wait"] = time.monotonic() - waiting
                 with (work / "mfa.log").open("w", encoding="utf-8") as log:
+                    environment=cfg.get('environment')
+                    launch_options={}
+                    if environment is not None:
+                        if not isinstance(environment,dict) or not all(isinstance(k,str) and isinstance(v,str) for k,v in environment.items()):
+                            raise ValueError('mfa.environment must contain string keys and values')
+                        launch_options['env']={**os.environ,**environment}
                     executing = time.monotonic()
                     try:
                         process = run_mfa(args, stdout=log, stderr=subprocess.STDOUT,
                                          timeout=cfg["timeout_sec"], check=False,
-                                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), **launch_options)
                     except FileNotFoundError as exc:
                         raise RuntimeError("MFA could not start. Install its Conda environment and configure "
                                    "mfa.command in phoneme_scoring/settings.local.json. "

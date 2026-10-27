@@ -20,6 +20,17 @@ def failure(code, message, retryable=False, **ids):
     return {"ok": False, **ids, "error": {"code": code, "user_message": message, "retryable": retryable}}
 
 
+def development_fixture(snapshot):
+    """Map approved flat snapshots into this standalone demo's internal shape."""
+    result=deepcopy(snapshot)
+    result.setdefault('jobs',{})
+    for kind,flat in [('analysis','analysis'),('example_generation','generation'),('accent_conversion','conversion')]:
+        result['jobs'].setdefault(kind,dict(job_id=None,input_revision=result.get('input_revision',1),
+                                          status=result.get(flat+'_status') or 'not_requested',timings_ms={},error=None))
+    result.setdefault('generated_assets',[])
+    return result
+
+
 class DevelopmentStore:
     """Replace with Lucas's authorized, atomic persistent storage adapter at integration.
 
@@ -38,7 +49,7 @@ class DevelopmentStore:
 
     def create(self, auth_context, fixture):
         with self.lock:
-            attempt = deepcopy(fixture)
+            attempt = development_fixture(fixture)
             attempt.update(attempt_id=uuid.uuid4().hex, user_id=auth_context,
                            confirmed_text=None, transcript_confirmed=False, input_revision=1,
                            generated_assets=[])
@@ -80,8 +91,8 @@ class DevelopmentStore:
                 return failure("TRANSCRIPT_CONFIRMATION_REQUIRED", "Confirm your text before generating an example.")
             if attempt["target_accent"] != TARGET_ACCENT:
                 return failure("UNSUPPORTED_ACCENT", "Only American English examples are available.")
-            if len(attempt["confirmed_text"]) > 1000:
-                return failure("UNSUPPORTED_TEXT", "Use at most 1,000 characters.")
+            if len(attempt["confirmed_text"]) > 200 or len(re.findall(r"[A-Za-z]+(?:['\u2019][A-Za-z]+)*",attempt["confirmed_text"]))>12:
+                return failure("UNSUPPORTED_TEXT", "Use at most 12 words and 200 characters.")
             previous = deepcopy(attempt["generated_assets"])
             attempt["generated_assets"] = []
             attempt["jobs"]["example_generation"] = self.job(revision, job_id, "queued")
@@ -129,8 +140,8 @@ class GenerationService:
                     (self.output_dir / (audio_id + extension)).unlink(missing_ok=True)
 
     def confirm_text(self, auth_context, attempt_id, text, accent, expected_revision):
-        if not isinstance(text, str) or not text.strip() or len(text) > 1000:
-            return failure("UNSUPPORTED_TEXT", "Enter between 1 and 1,000 characters.")
+        if not isinstance(text, str) or not text.strip() or len(text) > 200 or len(re.findall(r"[A-Za-z]+(?:['\u2019][A-Za-z]+)*",text))>12:
+            return failure("UNSUPPORTED_TEXT", "Enter at most 12 words and 200 characters.")
         if accent != TARGET_ACCENT:
             return failure("UNSUPPORTED_ACCENT", "Only American English examples are available.")
         try:

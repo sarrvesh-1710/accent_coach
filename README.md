@@ -1,3 +1,24 @@
+# Kokoro private-example integration: October 27, 2026
+
+The private practice site now calls Kokoro through its isolated generation environment by default. See [setup, verification and limitations](voice_generation/INTEGRATED_KOKORO.md). The October 13 notes below record the earlier Windows-TTS integration.
+
+# Local account website: October 13, 2026
+
+Local integration now includes custom text and free speech with explicit transcript confirmation, private revision-aware sessions, and separate synthetic playback. See [the integration report](docs/INTEGRATION_COMPLETION_REPORT.md) for verification, setup limits and remaining work. Preset lessons remain available. The local Windows speech backend works; the isolated Kokoro runtime is optional and is not installed by the main account requirements.
+
+The website now has real local sign-up/sign-in, **My profile**, and **My history**. New recordings and analysis results are stored under the signed-in account and remain after restarting the app.
+
+From your existing project environment:
+
+```powershell
+python -m pip install -r requirements-accounts.txt
+python site_server.py
+```
+
+Open `http://127.0.0.1:7861/` and create an account. `python app_2.py` starts the same new site. Models/MFA still use your existing configuration. See [account setup and verification](docs/ACCOUNTS_SETUP.md). This integrated version supersedes the earlier standalone Day 1 patch. Old unowned `runs/` history is preserved separately.
+
+The older release notes below describe previous versions. The October 13 account setup above is the current launch path.
+
 # accent_coach
 
 ## Parallel team work: October 12, 2026
@@ -74,7 +95,7 @@ the setup below. Results schema 3 includes `spoken_words_verification`,
 remains null/unvalidated.
 
 The experimental sequence margin is `log P(expected sequence|audio) - log P(best
-configured substitution sequence|audio)`. The default ±1 nat decision boundary
+configured substitution sequence|audio)`. The default Â±1 nat decision boundary
 is an abstention heuristic, not a calibrated accuracy threshold. Missing sentence
 verification, clipping, unsupported target context, weak local sound evidence,
 or a close comparison prevent positive/negative sound feedback. Accepted lexical
@@ -100,7 +121,7 @@ python -m venv .venv
 ```
 
 The application opens on localhost. Select a sentence, upload a WAV of the
-same sentence (ideally 2–5 seconds, maximum 5), and click Analyze. Each attempt
+same sentence (ideally 2â€“5 seconds, maximum 5), and click Analyze. Each attempt
 saves `runs/<run_id>/results.json`; accepted learner audio is copied into that
 run folder for playback. Delete a run folder to remove its retained recording
 and results. These files stay local and are excluded from Git.
@@ -193,7 +214,7 @@ or a real learner/reference speech pair. Those checks require the team assets.
 
 ## Sarrvesh: CPU audio analysis
 
-Use Python 3.11–3.13. From this repository in PowerShell:
+Use Python 3.11â€“3.13. From this repository in PowerShell:
 
 ```powershell
 py -3.13 -m venv .venv
@@ -258,7 +279,7 @@ margin. No evidence means blank, not zero. Multiple frames are not necessarily
 independent. Alignment with a supplied transcript does not verify the spoken words.
 
 Pitch uses a Gaussian-filtered analysis copy followed by Praat autocorrelation,
-with a 50–500 Hz search range. Weak periodicity, estimates near the search limits,
+with a 50â€“500 Hz search range. Weak periodicity, estimates near the search limits,
 large adjacent jumps, and very short voiced runs are omitted and recorded in
 `pitch_invalid_reason`. Original recordings and model/alignment audio are unchanged.
 Background energy is now checked on the original signal: the floor is the larger
@@ -336,8 +357,8 @@ target sound only. Recording and result changes clear prior evidence.
 
 ## Historical milestone (October 7, 2026; superseded by the update above)
 
-The required path is **prompt text + learner WAV → learner DSP → MFA alignment →
-pretrained phoneme evidence → practice feedback**. No reference WAV is loaded by
+The required path is **prompt text + learner WAV â†’ learner DSP â†’ MFA alignment â†’
+pretrained phoneme evidence â†’ practice feedback**. No reference WAV is loaded by
 this analysis unless explicitly requested. The sentence is supplied to MFA;
 forced alignment is not independent recognition of the spoken words.
 
@@ -371,7 +392,7 @@ or measure pronunciation accuracy. It writes `runs/reference_free_smoke.json`.
 
 Initialize once (`--init` refuses to overwrite). Fill
 `data/evaluation/manifest.json` with consented WAV paths and listener labels.
-The plan has 3 speakers × 3 prompts × 2 takes × 2 conditions = 36 recordings.
+The plan has 3 speakers Ã— 3 prompts Ã— 2 takes Ã— 2 conditions = 36 recordings.
 Reserve speaker S03's 12 clips before tuning. Requested altered pronunciations
 are recording instructions, **not human labels**. Use an independent listener
 and mark unclear cases. `--run` saves results and target-word/phone evidence in

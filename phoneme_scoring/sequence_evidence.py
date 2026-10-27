@@ -60,7 +60,8 @@ def compare_targets(logp, segments, segment_rows, mapping, vocab, special_ids, b
         row = dict(word=spec["word"], expected_phone=spec["phone"], status="insufficient_evidence", reason=None)
         result["targets"].append(row)
         matches = [(i, s) for i, s in enumerate(active)
-                   if s.get("word", "").lower() == spec["word"].lower() and s["canonical_phone"] == spec["phone"]]
+                   if s.get("word", "").lower() == spec["word"].lower() and s["canonical_phone"] == spec["phone"]
+                   and ("segment_id" not in spec or s["segment_id"] == spec["segment_id"])]
         if len(matches) != 1 or not math.isfinite(expected_logp):
             row["reason"] = "Target not uniquely aligned or sequence has no valid CTC path."
             continue

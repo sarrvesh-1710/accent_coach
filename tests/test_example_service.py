@@ -7,7 +7,7 @@ import unittest
 import uuid
 import wave
 
-from voice_generation.service import DevelopmentStore, GenerationService, AttemptUnavailable
+from voice_generation.service import DevelopmentStore, GenerationService, AttemptUnavailable, development_fixture
 from voice_generation.generator import TARGET_ACCENT
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -40,7 +40,7 @@ class ExampleServiceTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(dir=ROOT / "runs")
         self.output = Path(self.temp.name)
         self.store = DevelopmentStore()
-        fixture = json.loads((ROOT / "contracts/examples/session.json").read_text())
+        fixture = development_fixture(json.loads((ROOT / "contracts/examples/session.json").read_text()))
         fixture["sound_results"] = [{"message": "Existing analysis"}]
         fixture["jobs"]["analysis"]["status"] = "completed"
         self.session = self.store.create("user-a", fixture)

@@ -1,6 +1,7 @@
 """One reusable CPU worker with a hard deadline and restart after failure.
 
-Local single-user deployment only. The worker retains model caches across tries.
+Local single-server deployment. The private account site queues users through
+this worker, which retains model caches across tries.
 Do not move a timed-out computation to an unbounded background thread.
 """
 import atexit
@@ -21,10 +22,28 @@ def _worker(requests, responses):
         request = requests.get()
         if request is None:
             return
-        path, identity, compare_reference = request
+        if isinstance(request, dict):
+            try:
+                from phoneme_scoring.align_audio import load_settings
+                from pathlib import Path
+                settings = load_settings(Path(__file__).parent/'phoneme_scoring/settings.json')
+                if request['kind']=='transcription':
+                    from speech_content import transcribe_audio
+                    result = transcribe_audio(request['path'],settings)
+                elif request['kind']=='analysis':
+                    from confirmed_analysis import run_confirmed_attempt
+                    result = run_confirmed_attempt(request['snapshot'],settings)
+                else:
+                    raise ValueError('Unsupported operation')
+                responses.put(('result',result))
+            except Exception:
+                responses.put(('error','The speech worker could not complete this operation.'))
+            continue
+        path, identity, compare_reference = request[:3]
+        options = {"output_root": request[3]} if len(request) == 4 else {}
         try:
             result = run_attempt(path, identity, compare_reference=compare_reference,
-                                 progress_callback=lambda message: responses.put(('progress', message)))
+                                 progress_callback=lambda message: responses.put(('progress', message)), **options)
             responses.put(('result', result))
         except Exception as exc:
             responses.put(('error', f'{type(exc).__name__}: {exc}'))
@@ -70,13 +89,13 @@ class AnalysisService:
         self.process = context.Process(target=self.worker_target, args=(self.requests, self.responses), daemon=False)
         self.process.start()
 
-    def run(self, path, identity, *, compare_reference=False, progress_callback=None):
+    def run(self, path, identity, *, compare_reference=False, progress_callback=None, output_root=None, operation=None):
         if not self.lock.acquire(blocking=False):
             raise RuntimeError('Another recording is being checked. Please wait and try again.')
         try:
             self._start()
             deadline = time.monotonic() + self.timeout_sec
-            self.requests.put((path, identity, compare_reference))
+            self.requests.put(operation if operation is not None else ((path, identity, compare_reference) if output_root is None else (path, identity, compare_reference, str(output_root))))
             while True:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
@@ -106,5 +125,5 @@ SERVICE = AnalysisService()
 atexit.register(SERVICE.close)
 
 
-def run_attempt(path, identity, *, compare_reference=False, progress_callback=None):
-    return SERVICE.run(path, identity, compare_reference=compare_reference, progress_callback=progress_callback)
+def run_attempt(path, identity, *, compare_reference=False, progress_callback=None, output_root=None):
+    return SERVICE.run(path, identity, compare_reference=compare_reference, progress_callback=progress_callback, output_root=output_root)

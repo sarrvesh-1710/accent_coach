@@ -13,6 +13,7 @@ import os
 import re
 import subprocess
 import tempfile
+import time
 try:
     from .process_lock import alignment_lock
 except ImportError:  # Standalone scoring CLI.
@@ -221,9 +222,10 @@ def attach_words(segments, tiers, duration):
     return words
 
 
-def run_mfa(args, *, stdout, stderr, timeout, check=False, creationflags=0):
+def run_mfa(args, *, stdout, stderr, timeout, check=False, creationflags=0, env=None):
     """Kill the owned process tree on timeout, before releasing the MFA lock."""
-    process = subprocess.Popen(args, stdout=stdout, stderr=stderr, creationflags=creationflags)
+    process = subprocess.Popen(args, stdout=stdout, stderr=stderr, creationflags=creationflags,
+                               **({'env':env} if env is not None else {}))
     try:
         code = process.wait(timeout=timeout)
         return subprocess.CompletedProcess(args, code)
@@ -244,7 +246,9 @@ def align_audio(audio, transcript, settings, run_dir) -> dict:
     Each attempt has a fresh directory (stale TextGrids cannot be reused).
     run_dir must be writable. Input WAV/LAB and MFA logs are retained for audit.
     """
-    result = {"status": "unavailable", "segments": [], "reason": None}
+    started = time.monotonic()
+    timings = {}
+    result = {"status": "unavailable", "segments": [], "reason": None, "timings_sec": timings}
     try:
         settings = load_settings(settings)
         x, sr, fingerprint = prepare_audio(audio, settings)
@@ -271,15 +275,33 @@ def align_audio(audio, transcript, settings, run_dir) -> dict:
                       sample_rate_hz=sr, transcript=transcript, command=args)
         # MFA extracts shared acoustic files even when temporary directories differ.
         # Serialize subprocesses across this user's app instances and test commands.
-        with alignment_lock(Path.home() / '.accent_coach' / 'mfa.lock'), (work / "mfa.log").open("w", encoding="utf-8") as log:
-            try:
-                process = run_mfa(args, stdout=log, stderr=subprocess.STDOUT,
+        waiting = time.monotonic()
+        timings["input_preparation"] = waiting - started
+        try:
+            with alignment_lock(Path.home() / '.accent_coach' / 'mfa.lock'):
+                timings["lock_wait"] = time.monotonic() - waiting
+                with (work / "mfa.log").open("w", encoding="utf-8") as log:
+                    environment=cfg.get('environment')
+                    launch_options={}
+                    if environment is not None:
+                        if not isinstance(environment,dict) or not all(isinstance(k,str) and isinstance(v,str) for k,v in environment.items()):
+                            raise ValueError('mfa.environment must contain string keys and values')
+                        launch_options['env']={**os.environ,**environment}
+                    executing = time.monotonic()
+                    try:
+                        process = run_mfa(args, stdout=log, stderr=subprocess.STDOUT,
                                          timeout=cfg["timeout_sec"], check=False,
-                                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-            except FileNotFoundError as exc:
-                raise RuntimeError("MFA could not start. Install its Conda environment and configure "
+                                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), **launch_options)
+                    except FileNotFoundError as exc:
+                        raise RuntimeError("MFA could not start. Install its Conda environment and configure "
                                    "mfa.command in phoneme_scoring/settings.local.json. "
                                    f"Missing command: {command[0]}") from exc
+                    finally:
+                        timings["subprocess_execution"] = time.monotonic() - executing
+        finally:
+            if "lock_wait" not in timings:
+                timings["lock_wait"] = time.monotonic() - waiting
+        parsing = time.monotonic()
         if process.returncode:
             raise RuntimeError(f"MFA exited {process.returncode}; inspect {work / 'mfa.log'}")
         if not output.is_file() or output.stat().st_size == 0:
@@ -297,6 +319,9 @@ def align_audio(audio, transcript, settings, run_dir) -> dict:
         if not any(s["canonical_phone"].lower() not in ("", "sil", "sp", "spn", "<eps>") for s in segments):
             raise ValueError("No usable speech phones in alignment")
         result.update(status="available", segments=segments, textgrid_path=str(output))
+        timings["output_processing"] = time.monotonic() - parsing
     except Exception as exc:
         result.update(status="unavailable", segments=[], reason=f"{type(exc).__name__}: {exc}")
+    finally:
+        timings["total"] = time.monotonic() - started
     return result

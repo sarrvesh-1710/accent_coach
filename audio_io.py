@@ -13,6 +13,33 @@ import numpy as np
 import soundfile as sf
 
 
+MAX_AUDIO_BYTES = 10 * 1024 * 1024
+MAX_DURATION_SEC = 5.0
+
+
+def inspect_audio_file(path, max_duration_sec=MAX_DURATION_SEC):
+    """Check file limits/metadata before decoding; never resample the input."""
+    limit = float(max_duration_sec)
+    if not np.isfinite(limit) or limit <= 0:
+        raise ValueError("max_duration_sec must be positive and finite.")
+    try:
+        if Path(path).stat().st_size > MAX_AUDIO_BYTES:
+            return dict(status="unavailable", reason="file_too_large")
+        with sf.SoundFile(Path(path)) as source:
+            if source.channels > 8 or source.samplerate > 192000:
+                return dict(status="unavailable", reason="unsupported_audio_layout")
+            if source.format not in {"WAV", "WAVEX", "RF64"}:
+                return dict(status="unavailable", reason="unsupported_format")
+            metadata = dict(original_sample_rate_hz=source.samplerate,
+                            original_channels=source.channels,
+                            original_duration_sec=source.frames / source.samplerate)
+            reason = ("empty_audio" if source.frames == 0 else
+                      "audio_too_long" if metadata["original_duration_sec"] > min(limit, MAX_DURATION_SEC) else None)
+            return dict(metadata, status="unavailable" if reason else "ok", reason=reason)
+    except (OSError, RuntimeError, ValueError, TypeError) as exc:
+        return dict(status="unavailable", reason="cannot_read_audio", error=str(exc))
+
+
 def prepare_audio(path, settings=None):
     """Return status 'ok', 'warning' or 'unavailable', never fabricated audio.
 
@@ -40,10 +67,11 @@ def prepare_audio(path, settings=None):
         "original_channels": None, "original_duration_sec": None,
         "trim_offset_sec": 0.0,
     }
+    inspected = inspect_audio_file(path, limit)
+    result.update({k: v for k, v in inspected.items() if k != "status"})
+    if inspected["status"] != "ok":
+        return result
     try:
-        if Path(path).stat().st_size > 10 * 1024 * 1024:
-            result['reason'] = 'file_too_large'
-            return result
         # Check metadata before allocating memory for potentially long input.
         with sf.SoundFile(Path(path)) as source:
             if source.channels > 8 or source.samplerate > 192000:
@@ -59,7 +87,7 @@ def prepare_audio(path, settings=None):
             if source.frames == 0:
                 result["reason"] = "empty_audio"
                 return result
-            if duration > limit:
+            if duration > min(limit, MAX_DURATION_SEC):
                 result["reason"] = "audio_too_long"
                 return result
             raw = source.read(dtype="float64", always_2d=True)

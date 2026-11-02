@@ -1,6 +1,7 @@
 """Deterministic elapsed-clock tests; no real MFA inference here."""
 from contextlib import contextmanager
 import importlib
+import json
 from pathlib import Path
 import subprocess
 import tempfile
@@ -64,6 +65,28 @@ class MFATimingTests(unittest.TestCase):
                          subprocess_execution=7, output_processing=5, total=17))
         self.assertEqual(self.events, ["locked", "released"])
 
+    def test_runtime_diagnostics_are_opt_in_and_omit_private_content(self):
+        path=Path(self.temp.name)/'diagnostics.jsonl'
+        result=dict(status='available',timings_sec={'total':3},dictionary_cache={'status':'hit'},
+            execution={'mode':'persistent','reused':True},transcript='private words',
+            command=['secret-command'],reason='private path',audio_sha256='private-fingerprint')
+        with patch.object(mfa,'DIAGNOSTIC_PATH',path):
+            mfa._write_runtime_diagnostic({},result)
+            self.assertFalse(path.exists())
+            mfa._write_runtime_diagnostic({'mfa_execution':{'diagnostics':True}},result)
+        text=path.read_text();record=json.loads(text)
+        self.assertEqual(record['timings_sec'],{'total':3})
+        self.assertEqual(record['execution']['reused'],True)
+        for private in ['private words','secret-command','private path','private-fingerprint']:
+            self.assertNotIn(private,text)
+
+    def test_runtime_diagnostic_write_failure_does_not_change_alignment(self):
+        self.settings['mfa_execution']={'diagnostics':True}
+        with patch.object(mfa,'DIAGNOSTIC_PATH',Path(self.temp.name)):
+            result=self.call()  # Opening an existing directory as a file fails.
+        self.assertEqual(result['status'],'available')
+        self.assertEqual(result['timings_sec']['total'],17)
+
     def test_lock_failure_has_no_subprocess_measurement(self):
         @contextmanager
         def fail_lock(path):
@@ -106,6 +129,46 @@ class MFATimingTests(unittest.TestCase):
         self.assertEqual(result['status'],'available')
         self.assertEqual(self.process.call_args.kwargs['env']['ACCENT_TIMING_TEST'],'child')
         self.assertEqual(os.environ.get('ACCENT_TIMING_TEST'),previous)
+
+    def test_opt_in_cache_is_under_lock_and_preserves_command_boundaries(self):
+        from phoneme_scoring import mfa_dictionary_cache as cache
+        self.settings['mfa']['dictionary_cache_directory'] = self.temp.name
+        def hit(*args):
+            self.assertEqual(self.events[-1], 'locked')
+            return True
+        with patch.object(cache, 'plan', return_value={'fixture': True}), \
+             patch.object(cache, 'seed', side_effect=hit), patch.object(cache, 'publish', side_effect=hit):
+            result = self.call()
+        self.assertEqual(result['status'], 'available', result)
+        self.assertEqual(result['dictionary_cache']['status'], 'hit')
+        self.assertEqual(self.process.call_args.args[0][-1], '--no_clean')
+        self.assertEqual(result['timings_sec']['subprocess_execution'], 7)
+        self.assertEqual(result['timings_sec']['lock_wait'], 3)
+
+    def test_cache_plan_or_publication_failure_keeps_normal_alignment(self):
+        from phoneme_scoring import mfa_dictionary_cache as cache
+        self.settings['mfa']['dictionary_cache_directory'] = self.temp.name
+        with patch.object(cache, 'plan', side_effect=OSError('cache unavailable')):
+            result = self.call()
+        self.assertEqual(result['status'], 'available')
+        self.assertEqual(result['dictionary_cache']['status'], 'bypassed')
+        self.assertNotIn('--no_clean', self.process.call_args.args[0])
+        with patch.object(cache, 'plan', return_value={'fixture': True}), \
+             patch.object(cache, 'seed', return_value=False), \
+             patch.object(cache, 'publish', side_effect=OSError('cache full')):
+            result = self.call()
+        self.assertEqual(result['status'], 'available')
+        self.assertTrue(result['dictionary_cache']['publication_failed'])
+
+    def test_timeout_never_publishes_cache(self):
+        from phoneme_scoring import mfa_dictionary_cache as cache
+        self.settings['mfa']['dictionary_cache_directory'] = self.temp.name
+        self.process.side_effect = subprocess.TimeoutExpired('fixture', 120)
+        with patch.object(cache, 'plan', return_value={'fixture': True}), \
+             patch.object(cache, 'seed', return_value=False), patch.object(cache, 'publish') as publish:
+            result = self.call()
+        self.assertEqual(result['status'], 'unavailable')
+        publish.assert_not_called()
 
 
 if __name__ == "__main__":

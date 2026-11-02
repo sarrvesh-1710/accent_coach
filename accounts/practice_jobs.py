@@ -16,8 +16,8 @@ class PracticeJobs:
             from analysis_service import SERVICE
             speech=SERVICE
         if generator is None:
-            from voice_generation.generator import generate_audio
-            generator=generate_audio
+            from voice_generation.runtime import configured_generator
+            generator=configured_generator()
         self.store,self.speech,self.generator=store,speech,generator
         self.owns_pool=pool is None
         self.pool=pool or ThreadPoolExecutor(max_workers=1,thread_name_prefix='confirmed-practice')
@@ -81,6 +81,8 @@ class PracticeJobs:
 
     def close(self):
         if self.owns_pool: self.pool.shutdown(wait=True)
+        close = getattr(self.generator, 'close', None)
+        if close: close()
 
     # Approved Python boundary; auth is an opaque login token, checked by Store.
     def create_attempt(self,auth,*,input_mode,target_accent,lesson_id=None):

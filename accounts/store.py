@@ -42,6 +42,9 @@ class Store(SessionMethods):
                 CREATE INDEX IF NOT EXISTS owner_attempts ON attempts(user_id, created);
                 CREATE TABLE IF NOT EXISTS auth_limits (
                     key TEXT PRIMARY KEY, started REAL NOT NULL, count INTEGER NOT NULL);
+                CREATE TABLE IF NOT EXISTS practice_preferences (
+                    user_id TEXT PRIMARY KEY REFERENCES users(id),
+                    learner_profile TEXT NOT NULL DEFAULT 'general');
             ''')
         try:
             self.db.chmod(0o600)
@@ -121,8 +124,11 @@ class Store(SessionMethods):
         if not token or len(token) > 128:
             return None
         with self.connect() as db:
-            row = db.execute('''SELECT u.id,u.username,u.display_name,u.goals,s.csrf
-                FROM sessions s JOIN users u ON s.user_id=u.id WHERE s.token_hash=? AND s.expires>?''',
+            row = db.execute('''SELECT u.id,u.username,u.display_name,u.goals,s.csrf,
+                COALESCE(p.learner_profile,'general') AS learner_profile
+                FROM sessions s JOIN users u ON s.user_id=u.id
+                LEFT JOIN practice_preferences p ON p.user_id=u.id
+                WHERE s.token_hash=? AND s.expires>?''',
                 (hashlib.sha256(token.encode()).hexdigest(), time.time())).fetchone()
         if not row:
             return None
@@ -144,14 +150,22 @@ class Store(SessionMethods):
                             job['status']='cancelled';state[kind+'_status']='cancelled';changed=True
                     if changed:self._save_practice(db,state)
 
-    def profile(self, owner, display_name, goals):
+    def profile(self, owner, display_name, goals, *, learner_profile=None):
         if not isinstance(display_name, str) or not 1 <= len(display_name.strip()) <= 60:
             raise ValueError('Enter a display name of 1–60 characters.')
         if not isinstance(goals, list) or any(g not in GOALS for g in goals):
             raise ValueError('Choose one of the available practice sounds.')
+        if learner_profile is not None:
+            from practice_guides import profile_guide
+            profile_guide(learner_profile)
         with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
             db.execute('UPDATE users SET display_name=?,goals=? WHERE id=?',
                        (display_name.strip(), json.dumps(list(dict.fromkeys(goals))), owner))
+            if learner_profile is not None:
+                db.execute('''INSERT INTO practice_preferences VALUES (?,?)
+                    ON CONFLICT(user_id) DO UPDATE SET learner_profile=excluded.learner_profile''',
+                           (owner, learner_profile))
 
     def create_attempt(self, owner, prompt, audio):
         identity = uuid.uuid4().hex

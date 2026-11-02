@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "id": "chinese",
+  "label": "Chinese accent",
+  "learner_language": "Mandarin Chinese",
+  "target_accent": "General American English",
+  "description": "English pronunciation practice for Mandarin-speaking learners. This profile does not synthesize or teach a Chinese accent.",
+  "dataset": {
+    "id": "speechocean762",
+    "source_url": "https://github.com/jimbozhang/speechocean762",
+    "root": "data/speechocean762",
+    "scores_file": "resource/scores.json",
+    "detail_file": "resource/scores-detail.json",
+    "evaluation_max_duration_sec": 30,
+    "scope": "Mandarin-speaking adults and children reading English; not all Chinese languages or accents.",
+    "completeness_scale": "preserve_raw_unverified"
+  },
+  "rubric": {
+    "phone_accuracy": {"min": 0, "max": 2, "labels": {"0": "incorrect or omitted", "1": "correct with a heavy accent", "2": "correct"}},
+    "word_accuracy": {"min": 0, "max": 10},
+    "word_stress": {"individual_rater_values": [5, 10]},
+    "sentence_accuracy": {"min": 0, "max": 10},
+    "sentence_fluency": {"min": 0, "max": 10},
+    "sentence_prosodic": {"min": 0, "max": 10}
+  },
+  "practice_phone_groups": [["TH", "T", "S", "F"], ["IH", "IY"], ["AE", "EH"]],
+  "practice_note": "Existing project practice contrasts, not assumed errors for Mandarin speakers.",
+  "calibration": {
+    "enabled": true,
+    "model_path": "models/chinese_phone_calibration.json",
+    "output_name": "Estimated expert phone rating",
+    "missing_model_policy": "raw_evidence_only",
+    "unsupported_policy": "abstain",
+    "uncertain_policy": "abstain"
+  },
+  "feedback": {
+    "note": "Practice is evaluated against the selected American English target. Having an accent is not automatically a pronunciation error.",
+    "automatic_error_labels": false
+  }
+}

@@ -87,6 +87,71 @@ class PracticeSessionTests(unittest.TestCase):
             self.assertEqual(self.client.get(f'/api/sessions/{self.id}/audio/{asset}').status_code,200)
         self.assertIn(self.id,[a['id'] for a in self.client.get('/api/attempts').json()['attempts']])
 
+    def test_early_confirmation_does_not_cancel_queued_or_processing_transcription(self):
+        self.create()
+        token=self.client.cookies['accent_session'];rev=self.state['input_revision']
+        receipt=self.store.begin_practice_job(token,self.id,rev,'transcription')
+        for status in ('queued','processing'):
+            if status=='processing':
+                snapshot=self.store.job_snapshot(token,self.id,receipt['job_id'],rev,'transcription')
+            response=self.client.post(f'/api/sessions/{self.id}/confirm',
+                json=dict(text='I think so',expected_revision=rev),headers=self.headers)
+            self.assertEqual(response.status_code,503,response.text)
+            self.assertEqual(response.json()['error']['code'],'BUSY')
+            current=self.client.get('/api/sessions/'+self.id).json()
+            self.assertEqual(current['transcription_status'],status)
+            self.assertEqual(current['input_revision'],rev)
+            self.assertIsNone(current['confirmed_text'])
+        self.assertTrue(self.store.publish_job(token,snapshot,'transcription',
+            dict(status='completed',recognized_text='I think so',model_id='fixture',model_revision='fixture')))
+        self.confirm()
+        self.assertEqual(self.state['recognized_text'],'I think so')
+        self.assertEqual(self.state['transcription_status'],'completed')
+        self.assertEqual(self.state['confirmed_text'],'I think so')
+
+    def test_analysis_failure_can_retry_without_old_results_or_changed_recording(self):
+        class FailSecondAnalysis(Speech):
+            calls=0
+            def run(self,*args,operation=None,**kwargs):
+                if operation['kind']=='analysis':
+                    self.calls+=1
+                    if self.calls==2:
+                        return dict(ok=False,error=dict(code='MODEL_UNAVAILABLE',user_message='Test transient failure.',retryable=True))
+                return super().run(*args,operation=operation,**kwargs)
+        self.app.state.practice_jobs.speech=FailSecondAnalysis()
+        self.create();self.confirm();rev=self.state['input_revision'];asset=self.state['learner_audio_id']
+        receipts=[]
+        for expected in ('completed','failed','completed'):
+            response=self.client.post(f'/api/sessions/{self.id}/jobs/analysis',json={'input_revision':rev},headers=self.headers)
+            self.assertEqual(response.status_code,202,response.text)
+            receipts.append(response.json()['job_id']);self.wait('analysis')
+            self.assertEqual(self.state['analysis_status'],expected,self.state)
+            self.assertEqual(self.state['input_revision'],rev)
+            self.assertEqual(self.state['learner_audio_id'],asset)
+            if expected=='failed':
+                self.assertEqual(self.state['sound_results'],[])
+                self.assertEqual(self.state['limitations'],[])
+                self.assertIn('analysis',self.state['errors'])
+            else:
+                self.assertTrue(self.state['sound_results'])
+                self.assertNotIn('analysis',self.state['errors'])
+        self.assertEqual(len(set(receipts)),3)
+        self.assertEqual(self.client.get(f'/api/sessions/{self.id}/audio/{asset}').content,wav())
+
+    def test_confirmed_text_cannot_start_analysis_during_transcription_retry(self):
+        self.create();self.confirm()
+        token=self.client.cookies['accent_session'];rev=self.state['input_revision']
+        receipt=self.store.begin_practice_job(token,self.id,rev,'transcription')
+        response=self.client.post(f'/api/sessions/{self.id}/jobs/analysis',
+            json={'input_revision':rev},headers=self.headers)
+        self.assertEqual(response.status_code,503,response.text)
+        state=self.client.get('/api/sessions/'+self.id).json()
+        self.assertEqual(state['transcription_status'],'queued')
+        self.assertIsNone(state['analysis_status'])
+        snapshot=self.store.job_snapshot(token,self.id,receipt['job_id'],rev,'transcription')
+        self.assertTrue(self.store.publish_job(token,snapshot,'transcription',
+            dict(status='completed',recognized_text='I think so',model_id='fixture',model_revision='fixture')))
+
     def test_second_user_cannot_read_edit_submit_play_or_delete(self):
         self.create();self.confirm()
         bob=self.enterContext(TestClient(self.app,base_url='http://localhost'))

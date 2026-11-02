@@ -93,6 +93,20 @@ class AccountIntegrationTests(unittest.TestCase):
             hashed = db.execute('SELECT password FROM users').fetchone()[0]
             self.assertTrue(hashed.startswith('$argon2id$'))
 
+    def test_practice_and_history_use_current_versioned_account_assets(self):
+        import hashlib
+        from site_pages import ASSETS
+        self.signup(self.client, 'alice')
+        for route in ('/practice?attempt=test-attempt', '/history?attempt=test-attempt'):
+            page = self.client.get(route)
+            self.assertEqual(page.status_code, 200)
+            for name in ('accounts.js', 'accounts.css'):
+                version = hashlib.sha256((ASSETS / name).read_bytes()).hexdigest()[:12]
+                self.assertIn(f'/site-assets/{name}?v={version}', page.text)
+                asset = self.client.get(f'/site-assets/{name}?v={version}')
+                self.assertEqual(asset.status_code, 200)
+                self.assertEqual(asset.content, (ASSETS / name).read_bytes())
+
     def test_second_user_cannot_read_play_download_or_delete_first_users_attempt(self):
         ah = self.signup(self.client, 'alice')
         identity, _ = self.attempt(self.client, ah)

@@ -151,6 +151,8 @@ class SessionMethods:
             self._revision(state,expected_revision)
             if not state['learner_audio_id']:
                 raise ValueError('Attach your recording first.')
+            if state['transcription_status'] in {'queued','processing'}:
+                raise Busy('Transcription is still running. Wait for the recognized words before confirming.')
             if state['confirmed_text']!=text.strip():
                 self._invalidate(state)
                 db.execute("DELETE FROM practice_assets WHERE attempt_id=? AND role!='learner'",(identity,))
@@ -169,6 +171,8 @@ class SessionMethods:
                 raise ValueError('Attach your recording first.')
             if kind!='transcription' and not state['confirmed_text']:
                 raise ValueError('Confirm the transcript first.')
+            if kind=='analysis' and state['transcription_status'] in {'queued','processing'}:
+                raise Busy('Transcription is still running. Wait for the recognized words before analysis.')
             old=state['_jobs'].get(kind)
             if old and old['revision']==revision and old['status'] in {'queued','processing'}:
                 return dict(ok=True,attempt_id=identity,input_revision=revision,job_id=old['id'],status='queued',_already_active=True)
@@ -179,7 +183,10 @@ class SessionMethods:
             if kind=='generation':
                 state.update(generated_audio_id=None,generated_audio_type=None)
                 db.execute("DELETE FROM practice_assets WHERE attempt_id=? AND role='synthetic_example'",(identity,))
-            if kind=='analysis': state['sound_results']=[]
+            if kind=='analysis':
+                state['sound_results']=[]
+                state['limitations']=[]
+                state['timings'].pop('analysis',None)
             self._save_practice(db,state)
             return dict(ok=True,attempt_id=identity,input_revision=revision,job_id=job,status='queued')
 

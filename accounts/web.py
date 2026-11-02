@@ -2,6 +2,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 import html
+import hashlib
 import io
 import json
 import logging
@@ -21,7 +22,7 @@ import soundfile as sf
 from accounts.store import Store, GOALS
 from accounts.sessions import Conflict, Busy, PreparationError
 from accounts.practice_jobs import PracticeJobs
-from site_pages import ROOT, page_html
+from site_pages import ROOT, ASSETS, page_html
 
 COOKIE = 'accent_session'
 MAX_AUDIO = 10 * 1024 * 1024
@@ -105,6 +106,7 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
             remove_private_work(work,store.root)
         yield
         jobs.close()
+        practice_jobs.close()
         from analysis_service import SERVICE
         SERVICE.close()
 
@@ -159,12 +161,14 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
     def shell(title, body, path, user=None, token=None):
         account_nav = '<nav class="account-nav" aria-label="Account">'
         if user:
-            account_nav += f'<span>Signed in as {html.escape(user["display_name"])}</span><form action="/logout" method="post"><input type="hidden" name="csrf" value="{user["csrf"]}"><button>Sign out</button></form>'
+            account_nav += f'<span id="signed-in-name">Signed in as {html.escape(user["display_name"])}</span><form action="/logout" method="post"><input type="hidden" name="csrf" value="{user["csrf"]}"><button>Sign out</button></form>'
         account_nav += '</nav>'
         meta = f'<meta name="csrf-token" content="{html.escape(user["csrf"] if user else (token or ""), quote=True)}">'
         content = page_html(title, 'Private English pronunciation practice and saved recordings.',
                             (account_nav if user else '') + body, path)
-        return content.replace('</head>', meta + '<link rel="stylesheet" href="/site-assets/accounts.css"><script src="/site-assets/accounts.js" defer></script></head>')
+        css_version = hashlib.sha256((ASSETS / 'accounts.css').read_bytes()).hexdigest()[:12]
+        js_version = hashlib.sha256((ASSETS / 'accounts.js').read_bytes()).hexdigest()[:12]
+        return content.replace('</head>', meta + f'<link rel="stylesheet" href="/site-assets/accounts.css?v={css_version}"><script src="/site-assets/accounts.js?v={js_version}" defer></script></head>')
 
     def auth_page(request, signup=False, error='', status=200):
         token = request.cookies.get('accent_login_csrf') or secrets.token_urlsafe(32)
@@ -240,10 +244,14 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
             return RedirectResponse('/login', status_code=303)
         options = ''.join(f'<option value="{html.escape(p["id"], quote=True)}">{html.escape(p["text"])}</option>' for p in prompts)
         body = f'''<h1>Practice English pronunciation.</h1><p>Choose a sentence, record up to five seconds, then review your saved result.</p>
+        <section class="account-card" id="practice-guide"><h2>American sound practice</h2>
+        <p id="guide-profile"></p><label for="guide-sentence">Choose a sound guide</label><select id="guide-sentence"></select>
+        <div id="guide-target"></div><button id="use-guide" type="button">Practice these words</button>
+        <p id="guide-status" role="status"></p></section>
         <section class="account-card"><label for="input-mode">Practice mode</label><select id="input-mode"><option value="preset">Preset lesson</option><option value="custom_text">My own sentence</option><option value="free_speech">Free speech</option></select>
-        <label for="lesson">Practice sentence</label><select id="lesson">{options}</select>
+        <label id="lesson-label" for="lesson">Practice sentence</label><select id="lesson">{options}</select>
         <label id="custom-label" hidden>My sentence (up to 12 words and 200 characters)<textarea id="custom-text" maxlength="200" rows="3"></textarea></label>
-        <p id="lesson-hint"></p><audio id="example" controls></audio><p>Synthetic listening example; not used to score your voice.</p>
+        <p id="lesson-hint"></p><audio id="example" controls></audio><p id="example-label">Synthetic listening example; not used to score your voice.</p>
         <div class="record-actions"><button id="record">Record my voice</button><button id="stop" disabled>Stop recording</button></div>
         <label>Or upload a WAV<input id="recording-file" type="file" accept=".wav,audio/wav"></label>
         <audio id="preview" controls hidden></audio><button id="analyze" class="primary" disabled>Check and save my recording</button>
@@ -258,13 +266,30 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
         user = current(request)
         if not user:
             return RedirectResponse('/login', status_code=303)
-        goals = ''.join(f'<label class="goal"><input type="checkbox" name="goal" value="{g}" {"checked" if g in user["goals"] else ""}> {g}</label>' for g in GOALS)
-        body = f'''<h1>My profile</h1><section class="account-card"><p>Username: <strong>{html.escape(user['username'])}</strong></p>
-        <form id="profile-form" class="account-form"><label>Display name<input id="display-name" value="{html.escape(user['display_name'], quote=True)}" maxlength="60" required></label>
-        <p>Target accent: General American English</p><fieldset><legend>Sounds I want to practice</legend>{goals}</fieldset>
-        <p>TH as in think, IH as in ship, AE as in bad. Leave all unchecked for general suggestions.</p>
-        <button class="primary">Save profile</button><p id="profile-status" role="status"></p></form></section>'''
-        return HTMLResponse(shell('My profile', body, '/profile', user))
+        labels = {'TH': 'think', 'IH': 'ship', 'AE': 'bad'}
+        goals = ''.join(f'<label class="profile-goal"><input type="checkbox" name="goal" value="{g}" {"checked" if g in user["goals"] else ""}><span><strong>{g}</strong><span>as in {labels[g]}</span></span></label>' for g in GOALS)
+        from practice_guides import PROFILES, profile_guide
+        profile_options = ''.join(f'<option value="{key}" {"selected" if user["learner_profile"] == key else ""}>{html.escape(profile_guide(key)["label"])}</option>' for key in PROFILES)
+        body = f'''<div class="profile-intro"><p class="eyebrow">Your learning preferences</p><h1>My profile</h1>
+        <p>Choose how your name appears and the sounds you want to focus on.</p></div>
+        <section class="account-card profile-card"><header class="profile-header"><h2 id="profile-heading-name">{html.escape(user['display_name'])}</h2>
+        <p>Username: <strong>{html.escape(user['username'])}</strong></p></header>
+        <form id="profile-form" class="account-form profile-form">
+        <label for="display-name">Display name<input id="display-name" name="display_name" value="{html.escape(user['display_name'], quote=True)}" maxlength="60" required autocomplete="nickname" aria-describedby="display-name-help"></label>
+        <p id="display-name-help" class="profile-help">1–60 characters. This is the name shown when you sign in.</p>
+        <div class="profile-accent"><h3>Target accent</h3><p>General American English</p></div>
+        <label for="learner-profile">Optional learner guidance<select id="learner-profile">{profile_options}</select></label>
+        <p class="profile-help">This preference changes practice guidance only. It does not infer your language or change grading. Mandarin-specific calibrated ratings are not enabled.</p>
+        <fieldset aria-describedby="profile-goals-help"><legend>Sounds I want to practice</legend>
+        <div class="profile-goals">{goals}</div></fieldset>
+        <p id="profile-goals-help" class="profile-help">Choose sounds to focus on, or leave them unchecked for general practice. These preferences guide suggestions; they are not pronunciation results.</p>
+        <p id="profile-selection" class="profile-selection" aria-live="polite"></p>
+        <div class="profile-actions"><button id="profile-save" class="primary" disabled>Save changes</button><button id="profile-discard" type="button" disabled>Discard changes</button></div>
+        <p id="profile-status" role="status" aria-live="polite">Your profile is up to date.</p></form></section>'''
+        page = shell('My profile', body, '/profile', user)
+        css_version = hashlib.sha256((ASSETS / 'profile.css').read_bytes()).hexdigest()[:12]
+        js_version = hashlib.sha256((ASSETS / 'profile.js').read_bytes()).hexdigest()[:12]
+        return HTMLResponse(page.replace('</head>', f'<link rel="stylesheet" href="/site-assets/profile.css?v={css_version}"><script src="/site-assets/profile.js?v={js_version}" defer></script></head>'))
 
     @site.get('/history')
     def history_page(request: Request):
@@ -279,7 +304,7 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
     @site.get('/api/me')
     def me(request: Request):
         user = require(request)
-        return {k: user[k] for k in ('username', 'display_name', 'goals')}
+        return {k: user[k] for k in ('username', 'display_name', 'goals', 'learner_profile')}
 
     @site.post('/api/profile')
     async def save_profile(request: Request):
@@ -287,10 +312,11 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
         csrf(request, request.headers.get('x-csrf-token'), user['csrf'])
         body = await json_body(request)
         try:
-            store.profile(user['id'], body.get('display_name'), body.get('goals'))
+            store.profile(user['id'], body.get('display_name'), body.get('goals'), learner_profile=body.get('learner_profile'))
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from None
-        return {'ok': True}
+        saved = require(request)
+        return {'ok': True, 'profile': {k: saved[k] for k in ('username', 'display_name', 'goals', 'learner_profile')}}
 
     @site.get('/api/lessons')
     def lessons(request: Request):
@@ -301,6 +327,13 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
     def suggestions(request: Request):
         user = require(request)
         return {'phones': store.suggestions(user['id'], user['goals'])}
+
+    @site.get('/api/practice-guides')
+    def guides(request: Request):
+        user = require(request)
+        from practice_guides import practice_guides
+        from voice_generation.runtime import generation_capabilities
+        return dict(practice_guides(user['learner_profile']), generation=generation_capabilities())
 
     @site.get('/api/attempts')
     def history(request: Request):

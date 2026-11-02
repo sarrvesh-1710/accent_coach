@@ -1,8 +1,8 @@
 # Kokoro in the private practice website
 
-October 27, 2026. Local work on `feature/voice-conversion` incorporates the team
-site from `origin/feature/speed-free-speech` at `e7f57d9`. Other branches are
-preserved. The merge and the Kokoro connection are pending review/commit.
+The combined demo branch `parth/demo-ready` includes the team practice site,
+profile improvements and the isolated Kokoro connection. See
+[the combined guide](../docs/COMBINED_DEMO.md) for the current demo entry point.
 
 ## Run
 

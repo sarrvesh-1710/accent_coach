@@ -1,3 +1,7 @@
+# Combined local demo
+
+Run `powershell -ExecutionPolicy Bypass -File .\start_demo.ps1` from the repository root. See [the combined demo guide](docs/COMBINED_DEMO.md) for the walkthrough, setup and verification. Includes private accounts, profile preferences, history, preset/custom/free-speech practice, confirmed-text sound analysis and isolated Kokoro playback.
+
 # Kokoro private-example integration: October 27, 2026
 
 The private practice site now calls Kokoro through its isolated generation environment by default. See [setup, verification and limitations](voice_generation/INTEGRATED_KOKORO.md). The October 13 notes below record the earlier Windows-TTS integration.

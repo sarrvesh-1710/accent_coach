@@ -241,15 +241,25 @@ async function showSession(id) {
   if($('confirmed-editor').value!==editorValue)$('confirmed-editor').value=editorValue;
   $('session-check').disabled=sessionDirty || !state.confirmed_text || ['queued','processing'].includes(state.analysis_status);
   $('session-generate').disabled=sessionDirty || !state.confirmed_text || ['queued','processing'].includes(state.generation_status);
-  $('session-status').textContent=['transcription','analysis','generation'].map(k=>`${k}: ${state[k+'_status'] || 'not started'}`).join('; ');
+  const active=['transcription','analysis','generation'].find(k=>['queued','processing'].includes(state[k+'_status']));
+  const messages={transcription:'Recognizing your words. Please wait.',analysis:'Checking the confirmed sounds. The first check may take longer while models load.',generation:'Preparing your listening example. The first example may take longer while the voice loads.'};
+  $('session-status').textContent=active ? messages[active] : sessionDirty ? 'Confirm your edited words to continue.' : !state.confirmed_text ? 'Review the words below, then confirm your transcript.' : 'Transcript confirmed. You can analyze your recording and hear a synthetic example separately.';
   const results=$('session-results');
-  const renderKey=JSON.stringify([sessionDirty,state.sound_results,state.limitations,state.generated_audio_id,state.errors,state.analysis_status]);
+  const renderKey=JSON.stringify([sessionDirty,state.sound_results,state.limitations,state.generated_audio_id,state.errors,state.analysis_status,state.timings]);
   if(results.dataset.renderKey!==renderKey){
   results.querySelectorAll('audio').forEach(audio=>audio.pause());results.replaceChildren();results.dataset.renderKey=renderKey;
   if(!sessionDirty){
     for(const row of state.sound_results) results.append(element('p',`${row.word} /${row.expected_phone}/: ${row.outcome}. ${row.message}`));
-    if(state.analysis_status==='completed'&&!state.sound_results.length)results.append(element('p','No supported target sounds could be assessed in this recording.'));
-    for(const limitation of state.limitations)results.append(element('p',limitation));
+    if(state.analysis_status==='completed'&&!state.sound_results.length)results.append(element('p','Analysis finished, but no supported target sounds could be assessed. Try a short sentence with TH as in think, IH as in ship, or AE as in bad.'));
+    if(state.analysis_status==='completed')results.append(element('p','Experimental sound feedback, not a pronunciation grade.'));
+    if(state.limitations.length || Object.keys(state.timings || {}).length){
+      const details=element('details');details.append(element('summary','Processing details'));
+      for(const limitation of state.limitations)details.append(element('p',limitation));
+      for(const [kind,timing] of Object.entries(state.timings || {})){
+        if(Number.isFinite(timing.processing_ms))details.append(element('p',kind+': '+(timing.processing_ms/1000).toFixed(1)+' seconds processing.'));
+      }
+      results.append(details);
+    }
     if(state.generated_audio_id){const audio=element('audio');audio.controls=true;audio.src=`/api/sessions/${id}/audio/${state.generated_audio_id}`;results.append(element('p','Synthetic listening example. This is a generated voice, not a conversion of your voice.'),audio);}
   }
   for(const error of Object.values(state.errors))results.append(element('p',error.user_message,'form-error'));

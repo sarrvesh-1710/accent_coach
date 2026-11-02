@@ -159,7 +159,7 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
     def shell(title, body, path, user=None, token=None):
         account_nav = '<nav class="account-nav" aria-label="Account">'
         if user:
-            account_nav += f'<span>Signed in as {html.escape(user["display_name"])}</span><form action="/logout" method="post"><input type="hidden" name="csrf" value="{user["csrf"]}"><button>Sign out</button></form>'
+            account_nav += f'<span id="signed-in-name">Signed in as {html.escape(user["display_name"])}</span><form action="/logout" method="post"><input type="hidden" name="csrf" value="{user["csrf"]}"><button>Sign out</button></form>'
         account_nav += '</nav>'
         meta = f'<meta name="csrf-token" content="{html.escape(user["csrf"] if user else (token or ""), quote=True)}">'
         content = page_html(title, 'Private English pronunciation practice and saved recordings.',
@@ -258,13 +258,24 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
         user = current(request)
         if not user:
             return RedirectResponse('/login', status_code=303)
-        goals = ''.join(f'<label class="goal"><input type="checkbox" name="goal" value="{g}" {"checked" if g in user["goals"] else ""}> {g}</label>' for g in GOALS)
-        body = f'''<h1>My profile</h1><section class="account-card"><p>Username: <strong>{html.escape(user['username'])}</strong></p>
-        <form id="profile-form" class="account-form"><label>Display name<input id="display-name" value="{html.escape(user['display_name'], quote=True)}" maxlength="60" required></label>
-        <p>Target accent: General American English</p><fieldset><legend>Sounds I want to practice</legend>{goals}</fieldset>
-        <p>TH as in think, IH as in ship, AE as in bad. Leave all unchecked for general suggestions.</p>
-        <button class="primary">Save profile</button><p id="profile-status" role="status"></p></form></section>'''
-        return HTMLResponse(shell('My profile', body, '/profile', user))
+        labels = {'TH': ('TH', 'think'), 'IH': ('IH', 'ship'), 'AE': ('AE', 'bad')}
+        goals = ''.join(f'<label class="profile-goal"><input type="checkbox" name="goal" value="{g}" {"checked" if g in user["goals"] else ""}><span><strong>{labels[g][0]}</strong><span>as in {labels[g][1]}</span></span></label>' for g in GOALS)
+        body = f'''<div class="profile-intro"><p class="eyebrow">Your learning preferences</p><h1>My profile</h1>
+        <p>Choose how your name appears and the sounds you want to focus on.</p></div>
+        <section class="account-card profile-card"><header class="profile-header"><h2 id="profile-heading-name">{html.escape(user['display_name'])}</h2>
+        <p>Username: <strong>{html.escape(user['username'])}</strong></p></header>
+        <form id="profile-form" class="account-form profile-form">
+        <label for="display-name">Display name<input id="display-name" name="display_name" value="{html.escape(user['display_name'], quote=True)}" maxlength="60" required autocomplete="nickname" aria-describedby="display-name-help"></label>
+        <p id="display-name-help" class="profile-help">1–60 characters. This is the name shown when you sign in.</p>
+        <div class="profile-accent"><h3>Target accent</h3><p>General American English</p></div>
+        <fieldset aria-describedby="profile-goals-help"><legend>Sounds I want to practice</legend>
+        <div class="profile-goals">{goals}</div></fieldset>
+        <p id="profile-goals-help" class="profile-help">Choose any sounds to focus on, or leave them unchecked for general practice. These preferences guide suggestions; they are not pronunciation results.</p>
+        <p id="profile-selection" class="profile-selection" aria-live="polite"></p>
+        <div class="profile-actions"><button id="profile-save" class="primary" disabled>Save changes</button><button id="profile-discard" type="button" disabled>Discard changes</button></div>
+        <p id="profile-status" role="status" aria-live="polite">Your profile is up to date.</p></form></section>'''
+        page = shell('My profile', body, '/profile', user)
+        return HTMLResponse(page.replace('</head>', '<link rel="stylesheet" href="/site-assets/profile.css"><script src="/site-assets/profile.js" defer></script></head>'))
 
     @site.get('/history')
     def history_page(request: Request):
@@ -290,7 +301,7 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
             store.profile(user['id'], body.get('display_name'), body.get('goals'))
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from None
-        return {'ok': True}
+        return {'ok': True, 'profile': {'username': user['username'], 'display_name': body['display_name'].strip(), 'goals': list(dict.fromkeys(body['goals']))}}
 
     @site.get('/api/lessons')
     def lessons(request: Request):

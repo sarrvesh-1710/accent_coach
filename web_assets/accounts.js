@@ -89,13 +89,6 @@ async function suggestions() {
   const {phones} = await api('/api/suggestions');
   $('suggestions').textContent = phones.length ? 'Based on possible substitutions in recent attempts, try: ' + phones.join(', ') + '. These suggestions do not establish errors or improvement.' : 'No practice-specific findings yet. Choose a sentence or set your preferred sounds in My profile.';
 }
-if ($('profile-form')) $('profile-form').addEventListener('submit', async event => {
-  event.preventDefault();
-  try {
-    await api('/api/profile', {method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({display_name: $('display-name').value, goals: [...document.querySelectorAll('input[name="goal"]:checked')].map(n => n.value)})});
-    $('profile-status').textContent = 'Profile saved. Your goals will guide practice suggestions.';
-  } catch (error) { $('profile-status').textContent = error.message; }
-});
 if ($('history-list')) history().catch(error => {$('history-status').textContent = error.message;});
 if ($('lesson')) {
   let wav = null, previewUrl = null, recorder = null, stream = null, stopTimer = null, lessons = [];

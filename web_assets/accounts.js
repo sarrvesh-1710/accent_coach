@@ -86,10 +86,14 @@ async function history() {
   }
 }
 async function suggestions() {
-  const {phones} = await api('/api/suggestions');
-  $('suggestions').textContent = phones.length ? 'Based on possible substitutions in recent attempts, try: ' + phones.join(', ') + '. These suggestions do not establish errors or improvement.' : 'No practice-specific findings yet. Choose a sentence or set your preferred sounds in My profile.';
+  const {recommendations:plan} = await api('/api/profile/progress');
+  const panel=$('suggestions');panel.replaceChildren();
+  for(const next of (plan || []).slice(0,2)){
+    panel.append(element('p',next.phone+' as in '+next.word+': '+next.reason));
+    if(next.lesson_id){const link=element('a','Practice: '+next.sentence);link.href='/practice?lesson='+encodeURIComponent(next.lesson_id);panel.append(link);}
+  }
 }
-if ($('history-list')) history().catch(error => {$('history-status').textContent = error.message;});
+if ($('history-list')) history().then(()=>{const id=new URLSearchParams(location.search).get('attempt');if(id)return showAttempt(id);}).catch(error => {$('history-status').textContent = error.message;});
 if ($('lesson')) {
   let wav = null, previewUrl = null, recorder = null, stream = null, stopTimer = null, lessons = [];
   function acceptRecording(blob) {
@@ -192,7 +196,7 @@ if ($('lesson')) {
     clearTimeout(sessionTimer); sessionId = null;
     $('session-panel').hidden = true;
   });
-  api('/api/lessons').then(data => {lessons = data; selectLesson();}).catch(error => {$('practice-status').textContent = error.message;});
+  api('/api/lessons').then(data => {lessons = data; const requested=new URLSearchParams(location.search).get('lesson');if(lessons.some(p=>p.id===requested))$('lesson').value=requested;selectLesson();}).catch(error => {$('practice-status').textContent = error.message;});
   suggestions().catch(() => {});
   window.addEventListener('pagehide', () => {stopMicrophone(); if (previewUrl) URL.revokeObjectURL(previewUrl);});
 }
@@ -265,5 +269,6 @@ async function showSession(id) {
   for(const error of Object.values(state.errors))results.append(element('p',error.user_message,'form-error'));
   }
   clearTimeout(sessionTimer);
+  if($('suggestions') && state.analysis_status==='completed')await suggestions();
   if(['transcription','analysis','generation'].some(k=>['queued','processing'].includes(state[k+'_status'])))sessionTimer=setTimeout(()=>showSession(id).catch(error=>{$('session-status').textContent=error.message;}),1500);
 }

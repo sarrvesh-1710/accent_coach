@@ -1,5 +1,7 @@
 # Combined local demo
 
+**Personalized profile demo:** run `powershell -ExecutionPolicy Bypass -File .\start_demo.ps1 -Demo`, open http://127.0.0.1:7864/profile, and sign in as `demo_learner` / `demo-practice-403!`. Sample history is clearly labeled and stored separately from personal data. Profiles now turn saved practice results into sound feedback and recommended lessons.
+
 Run `powershell -ExecutionPolicy Bypass -File .\start_demo.ps1` from the repository root. See [the combined demo guide](docs/COMBINED_DEMO.md) for the walkthrough, setup and verification. Includes private accounts, profile preferences, history, preset/custom/free-speech practice, confirmed-text sound analysis and isolated Kokoro playback.
 
 # Kokoro private-example integration: October 27, 2026

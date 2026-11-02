@@ -1,4 +1,4 @@
-param([int]$Port = 7861, [switch]$NoBrowser)
+param([int]$Port = 7861, [switch]$NoBrowser, [switch]$Demo)
 $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath $PSScriptRoot
 $python = Join-Path $PSScriptRoot '.venv\Scripts\python.exe'
@@ -11,7 +11,14 @@ if ($env:ACCENT_COACH_GENERATION_BACKEND -eq 'kokoro') {
 }
 $env:GRADIO_SERVER_PORT = "$Port"
 $env:ACCENT_COACH_OPEN_BROWSER = if ($NoBrowser) { '0' } else { '1' }
+if ($Demo -and !$PSBoundParameters.ContainsKey('Port')) { $Port = 7864 }
 Write-Host "Accent Coach demo: http://127.0.0.1:$Port/"
-Write-Host 'Use Ctrl+C to stop. Accounts and recordings stay in private_data.'
-& $python site_server.py
+if ($Demo) { Write-Host 'Sample history is stored separately in runs/profile_demo. Use Ctrl+C to stop.' } else { Write-Host 'Use Ctrl+C to stop. Accounts and recordings stay in private_data.' }
+if ($Demo) {
+    $demoArguments = @('tools/run_profile_demo.py', '--port', "$Port")
+    if ($NoBrowser) { $demoArguments += '--no-browser' }
+    & $python @demoArguments
+} else {
+    & $python site_server.py
+}
 exit $LASTEXITCODE

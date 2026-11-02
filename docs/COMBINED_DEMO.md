@@ -4,6 +4,33 @@ Branch: `parth/demo-ready`. This combines the integrated team practice site,
 Parth's profile improvements, and the isolated private Kokoro adapter. Teammate
 branches and `main` are unchanged. This is a local presentation build.
 
+## Show the personalized profile immediately
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\start_demo.ps1 -Demo
+```
+
+Open http://127.0.0.1:7864/profile. Sign in as `demo_learner` with password
+`demo-practice-403!`. The dashboard starts with five clearly labeled illustrative
+sample attempts. Show sound-specific feedback, the practice recommendation, and
+recent activity links. The normal microphone, analysis and Kokoro features remain
+real; new completed analyses update the profile. Return to My profile or press
+Refresh my feedback. The page also refreshes on focus and every 30 seconds.
+
+Use `demo_new` with the same password to demonstrate an empty starting profile.
+Demo data persists under ignored `runs/profile_demo`, separate from personal
+`private_data`. Re-launching preserves changes rather than resetting your demo.
+Sample results are not measurements and must not be presented as accuracy evidence.
+
+The coaching engine reads only the signed-in account's latest 100 non-deleted
+recordings. Each sound uses up to five current completed analyses, counted once
+per recording; the newest observation guides the recommendation. Recent possible
+substitutions come first, then inconclusive checks, then unassessed sounds, with
+selected goals breaking ties. A later expected-sound observation replaces earlier
+practice advice for that sound. Failed, deleted and superseded results never count
+as sound judgments. This is explainable practice guidance, not a learned clinical
+assessment or a validated improvement score.
+
 ## Launch on this laptop
 
 Open the actual `accent_coach` repository in VS Code, open its terminal, and run:
@@ -100,6 +127,21 @@ human rehearsal.
 - The launch script started the site successfully on port 7861; health and the
   browser sign-in page were verified. Live microphone testing remains a rehearsal
   step for the presenter.
+
+## Profile verification: November 2, 2026
+
+- Full suite: 174 tests ran, 173 passed, one existing Windows symlink skip.
+- Seven focused coaching checks cover empty profiles/goals, prioritization and
+  uncertainty, deleted/other-owner exclusion, stale revisions, later supported
+  observations, multiple occurrences per attempt, and authenticated API behavior.
+- Expanded real-engine rehearsal: all 50 checks passed. A real completed analysis
+  updates the profile; deletion removes it; another account sees no activity.
+- Browser checks verified the populated dashboard, lesson selection, history
+  deep links and persistence after server restart. A 390px mobile viewport had
+  no horizontal overflow. Normal and sample-workspace health endpoints passed.
+- Observed processing in this run: analysis 87.4 seconds, first Kokoro generation
+  45.3 seconds, warm generation 1.0 seconds. Allow time for cold loading and MFA.
+  These synthetic smoke measurements are not human accuracy or latency guarantees.
 
 ## Scope
 

@@ -162,6 +162,8 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
         if user:
             account_nav += f'<span id="signed-in-name">Signed in as {html.escape(user["display_name"])}</span><form action="/logout" method="post"><input type="hidden" name="csrf" value="{user["csrf"]}"><button>Sign out</button></form>'
         account_nav += '</nav>'
+        if os.environ.get('ACCENT_COACH_DEMO')=='1':
+            account_nav += '<aside class="account-card"><strong>Sample demo workspace</strong><p>The starting history is illustrative sample data, not measured speech. New recordings use the real models. Your personal account data is separate.</p></aside>'
         meta = f'<meta name="csrf-token" content="{html.escape(user["csrf"] if user else (token or ""), quote=True)}">'
         content = page_html(title, 'Private English pronunciation practice and saved recordings.',
                             (account_nav if user else '') + body, path)
@@ -262,7 +264,8 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
         labels = {'TH': ('TH', 'think'), 'IH': ('IH', 'ship'), 'AE': ('AE', 'bad')}
         goals = ''.join(f'<label class="profile-goal"><input type="checkbox" name="goal" value="{g}" {"checked" if g in user["goals"] else ""}><span><strong>{labels[g][0]}</strong><span>as in {labels[g][1]}</span></span></label>' for g in GOALS)
         body = f'''<div class="profile-intro"><p class="eyebrow">Your learning preferences</p><h1>My profile</h1>
-        <p>Choose how your name appears and the sounds you want to focus on.</p></div>
+        <p>Your practice, feedback and next steps in one place.</p></div>
+        <section class="account-card profile-card" aria-labelledby="progress-heading"><h2 id="progress-heading">My practice progress</h2><p id="progress-status" role="status">Loading your practice plan...</p><div id="profile-progress"></div></section>
         <section class="account-card profile-card"><header class="profile-header"><h2 id="profile-heading-name">{html.escape(user['display_name'])}</h2>
         <p>Username: <strong>{html.escape(user['username'])}</strong></p></header>
         <form id="profile-form" class="account-form profile-form">
@@ -303,6 +306,11 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from None
         return {'ok': True, 'profile': {'username': user['username'], 'display_name': body['display_name'].strip(), 'goals': list(dict.fromkeys(body['goals']))}}
+
+    @site.get('/api/profile/progress')
+    def progress_profile(request: Request):
+        from accounts.coaching import profile_progress
+        return profile_progress(store,require(request)['id'],prompts)
 
     @site.get('/api/lessons')
     def lessons(request: Request):

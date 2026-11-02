@@ -77,6 +77,9 @@ def main():
                 check('real_'+kind,state[kind+'_status']=='completed')
                 timings.setdefault(kind,[]).append(state['timings'][kind])
             check('sound_feedback_present',bool(state['sound_results']))
+            progress=client.get('/api/profile/progress').json()
+            check('live_profile_counts',progress['recordings']==1 and progress['analyzed']==1 and progress['examples']==1)
+            check('live_sound_feedback',any(s['observations'] for s in progress['sounds']))
             response=client.get(f'/api/sessions/{identity}/audio/{state["generated_audio_id"]}')
             check('private_generated_playback',response.status_code==200)
             with wave.open(io.BytesIO(response.content),'rb') as audio:
@@ -86,9 +89,11 @@ def main():
             with TestClient(client.app,base_url='http://localhost') as other:
                 signup(other,'demo_other',secrets.token_urlsafe(24))
                 check('other_account_denied',other.get('/api/sessions/'+identity).status_code==404)
+                check('other_profile_has_no_activity',other.get('/api/profile/progress').json()['recordings']==0)
                 check('other_audio_denied',other.get(f'/api/sessions/{identity}/audio/{state["generated_audio_id"]}').status_code==404)
             check('delete_attempt',client.delete('/api/attempts/'+identity,headers=auth).status_code==200)
             check('deleted_attempt_unavailable',client.get('/api/sessions/'+identity).status_code==404)
+            check('deleted_activity_removed_from_profile',client.get('/api/profile/progress').json()['recordings']==0)
             check('logout',client.post('/logout',data={'csrf':auth['X-CSRF-Token']}).status_code==200)
             check('logged_out_denied',client.get('/api/me').status_code==401)
         with TestClient(create_site(data_root=folder),base_url='http://localhost') as client:

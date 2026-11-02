@@ -15,9 +15,10 @@ class PracticeJobs:
         if speech is None:
             from analysis_service import SERVICE
             speech=SERVICE
+        self.owns_generator=generator is None
         if generator is None:
-            from voice_generation.generator import generate_audio
-            generator=generate_audio
+            from voice_generation.bridge import create_generator
+            generator=create_generator()
         self.store,self.speech,self.generator=store,speech,generator
         self.owns_pool=pool is None
         self.pool=pool or ThreadPoolExecutor(max_workers=1,thread_name_prefix='confirmed-practice')
@@ -55,10 +56,10 @@ class PracticeJobs:
                     result=self.speech.run(None,None,operation=dict(kind=kind,snapshot=snapshot))
                 else:
                     result=self.generator(snapshot['confirmed_text'],snapshot['target_accent'],output_dir=Path(folder))
-                stages=result.get('timings',{}).get(kind,{}).get('stages_ms',{})
+                stages=(result.get('timings_ms',{}) if kind=='generation' else result.get('timings',{}).get(kind,{}).get('stages_ms',{}))
                 result['timings']={kind:dict(queue_ms=(began-snapshot['_queued'])*1000,
                     processing_ms=(time.monotonic()-began)*1000,
-                    **({'stages_ms':stages} if kind=='analysis' else {}))}
+                    **({'stages_ms':stages} if kind in {'analysis','generation'} else {}))}
                 generated=None
                 if kind=='generation' and result.get('ok'):
                     asset_id=result.get('generated_audio_id','')
@@ -81,6 +82,7 @@ class PracticeJobs:
 
     def close(self):
         if self.owns_pool: self.pool.shutdown(wait=True)
+        if self.owns_generator and hasattr(self.generator,"close"): self.generator.close()
 
     # Approved Python boundary; auth is an opaque login token, checked by Store.
     def create_attempt(self,auth,*,input_mode,target_accent,lesson_id=None):

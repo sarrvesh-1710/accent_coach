@@ -105,6 +105,7 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
             remove_private_work(work,store.root)
         yield
         jobs.close()
+        practice_jobs.close()
         from analysis_service import SERVICE
         SERVICE.close()
 

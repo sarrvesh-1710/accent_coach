@@ -121,3 +121,16 @@ October 13 integration note: `accounts.practice_jobs.PracticeJobs` now supplies 
 - Parthiban: TTS model/provider, license, supported target voice, local versus external generation, and conversion feasibility.
 - All: processing concurrency, polling mechanism, retention/deletion requirements, and whether simultaneous example/conversion outputs are needed.
 - All: implement contract, authorization and stale-job integration tests. Contract approval and synchronized fictional examples do not establish implementation or passing integration tests.
+
+## October 28 integration addendum
+
+Project lead Sarrvesh requested American practice, the Mandarin learner profile and optional Kokoro. These additions preserve the session contract and assessment behavior:
+
+- `/api/me` adds `learner_profile` (`general` or `chinese`). `/api/profile` accepts that optional field; omission preserves the saved preference. It is authorized from the login cookie, never a supplied owner ID. The preference uses an additive `practice_preferences` table in the same SQLite database. Older accounts default to `general`.
+- `/api/practice-guides` returns authenticated draft General American sentences, IPA/word guidance, profile explanations and safe generation-configuration notices. Choosing a guide for recording uses the existing custom-text, transcription and confirmation flow. It clears abandoned UI/audio state and does not auto-confirm words or run inference.
+- `chinese` denotes optional guidance for a Mandarin-speaking learner of General American English. It is not a Chinese target accent, detected identity, calibrated grade or change to assessment thresholds. Changing this preference does not invalidate past analysis, because it does not change the analyzed input or how findings are interpreted.
+- Lucas's calibration/evaluation modules are available for explicit offline research at their corrected package paths. No live worker imports or runs them. A trained model and held-out-speaker evaluation are still absent.
+- The default generation callable remains the existing Windows implementation. A server-only environment setting can select the isolated Kokoro adapter; it starts only on an explicit authorized generation request, never on assessment or page load. It accepts the same confirmed text, revision and output role and publishes through the existing atomic checks. Missing runtime/models fail generation independently of saved analysis. No browser-supplied executable or output path is accepted.
+- Kokoro is optional and remains disabled here. Its dependencies/models and concurrent memory/latency impact require a separate activation check. No voice-preserving conversion is implemented.
+
+See `TEAM_FEATURE_INTEGRATION_2026-10-28.md` for executed tests, performance evidence and remaining limits.

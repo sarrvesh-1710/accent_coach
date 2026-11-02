@@ -1,4 +1,12 @@
-# Local account website: October 13, 2026
+# Accent Coach: team handoff, November 2, 2026
+
+Start with [the current teammate setup and walkthrough](docs/TEAM_START_HERE_2026-11-02.md). The reviewed application work is published on `feature/speed-free-speech`; this does not imply a merge into `main` or the other feature branches. The integrated site includes Practice results, private History/playback, profile preferences, American practice guides, and opt-in MFA resource/process reuse.
+
+**Speed is not a ten-second guarantee.** Earlier prepared runs were often below ten seconds, but the November 2 check recorded 93.00 seconds for initial transcription and 41.05 seconds for analysis. A subsequent preset run took 32.54 seconds despite active process and graph reuse. See [the measured incident and limitations](docs/SPEED_INCIDENT_2026-11-02.md). Do not substitute earlier warm timings for current demo measurements.
+
+Run the existing configured installation with `.\.venv\Scripts\python.exe app_2.py`, then open `http://127.0.0.1:7861/`. Machine-specific model paths, cache settings, accounts, recordings, and downloaded weights are intentionally excluded from Git. The guide explains setup, remaining validation, and the optional generation backend.
+
+## Earlier account integration: October 13, 2026
 
 Local integration now includes custom text and free speech with explicit transcript confirmation, private revision-aware sessions, and separate synthetic playback. See [the integration report](docs/INTEGRATION_COMPLETION_REPORT.md) for verification, setup limits and remaining work. Preset lessons remain available. The local Windows speech backend works; the isolated Kokoro runtime is optional and is not installed by the main account requirements.
 
@@ -13,7 +21,7 @@ python site_server.py
 
 Open `http://127.0.0.1:7861/` and create an account. `python app_2.py` starts the same new site. Models/MFA still use your existing configuration. See [account setup and verification](docs/ACCOUNTS_SETUP.md). This integrated version supersedes the earlier standalone Day 1 patch. Old unowned `runs/` history is preserved separately.
 
-The older release notes below describe previous versions. The October 13 account setup above is the current launch path.
+The older release notes below describe previous versions. Use the November 2 guide above for the current integrated workflow; historical ownership, account limitations and timing statements below may have been superseded.
 
 # accent_coach
 

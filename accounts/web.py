@@ -15,6 +15,8 @@ import threading
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from starlette.middleware.trustedhost import TrustedHostMiddleware
+from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
+from server_config import load_server_config
 import numpy as np
 import soundfile as sf
 
@@ -92,8 +94,9 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
     if prompts is None:
         from pipeline import load_prompts
         prompts = load_prompts()
+    config=load_server_config()
     catalog = {p['id']: p for p in prompts}
-    store = Store(data_root or os.environ.get('ACCENT_COACH_DATA_DIR', ROOT / 'private_data'))
+    store = Store(data_root or config.data_dir)
     jobs = Jobs(store, analyzer)
     practice_jobs = PracticeJobs(store,speech,generator,pool=jobs.pool,slots=jobs.slots)
 
@@ -112,7 +115,9 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
 
     site = FastAPI(title='Accent Coach', docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     site.state.store, site.state.jobs, site.state.practice_jobs = store, jobs, practice_jobs
-    site.add_middleware(TrustedHostMiddleware, allowed_hosts=['localhost', '127.0.0.1', '[::1]'])
+    if config.hosted:site.add_middleware(HTTPSRedirectMiddleware)
+    site.add_middleware(TrustedHostMiddleware,allowed_hosts=list(config.allowed_hosts),www_redirect=False)
+    site.state.server_config=config
 
     @site.middleware('http')
     async def private_headers(request, call_next):
@@ -187,7 +192,7 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
         background_html=background_fields(DEFAULT) if signup else ''
         demo_hint='<p>Sample demo login: <strong>demo_starter</strong> / <strong>demo-practice-403!</strong>. Use demo_learner with the same password to see saved sample feedback.</p>' if os.environ.get('ACCENT_COACH_DEMO')=='1' else ''
         body = f'''<section class="account-card"><p class="eyebrow">Accent Coach</p><h1>{title}</h1>
-        <p>Your profile, recordings and results are saved on this computer under your account.</p>
+        <p>Your profile, recordings and results are saved privately under your account on this installation.</p>
         {demo_hint}<p class="form-error" role="alert">{html.escape(error)}</p>
         <form action="{action}" method="post" class="account-form">
         <input type="hidden" name="csrf" value="{html.escape(token, quote=True)}">{name}{background_html}
@@ -196,7 +201,7 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
         <p>Use at least 12 characters for your password.</p><button class="primary">{title}</button></form>
         <p><a href="{'/login' if signup else '/signup'}">{'Already have an account? Sign in' if signup else 'New here? Create an account'}</a></p></section>'''
         response = HTMLResponse(shell(title, body, action, token=token), status_code=status)
-        response.set_cookie('accent_login_csrf', token, httponly=True, samesite='strict', secure=request.url.scheme == 'https', max_age=3600)
+        response.set_cookie('accent_login_csrf', token, httponly=True, samesite='strict', secure=config.hosted or request.url.scheme == 'https', max_age=3600)
         return response
 
     @site.get('/')
@@ -232,7 +237,7 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
         if request.cookies.get(COOKIE):
             store.logout(request.cookies[COOKIE])
         response = RedirectResponse('/practice', status_code=303)
-        response.set_cookie(COOKIE, store.new_session(owner), httponly=True, samesite='strict', secure=request.url.scheme == 'https', max_age=7*86400)
+        response.set_cookie(COOKIE, store.new_session(owner), httponly=True, samesite='strict', secure=config.hosted or request.url.scheme == 'https', max_age=7*86400)
         response.delete_cookie('accent_login_csrf')
         return response
 

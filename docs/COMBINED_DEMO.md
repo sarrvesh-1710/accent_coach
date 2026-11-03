@@ -1,6 +1,6 @@
 # Combined local demo
 
-Branch: `parth/demo-ready`. This combines the integrated team practice site,
+Branch: `profile-system`. This combines the integrated team practice site,
 Parth's profile improvements, and the isolated private Kokoro adapter. Teammate
 branches and `main` are unchanged. This is a local presentation build.
 

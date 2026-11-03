@@ -1,3 +1,7 @@
+# Profile system and server handoff
+
+Active branch: `profile-system`. See [how profiles adapt](docs/PROFILE_SYSTEM.md) and [the server migration guide](docs/SERVER_DEPLOYMENT.md). Local demo commands below still work.
+
 # Combined local demo
 
 **Language starters:** sign in to the demo as `demo_starter` / `demo-practice-403!`. Signup and My profile offer five optional language backgrounds: Arabic, Hindi, Japanese, Mandarin Chinese and Spanish. Country is not collected or used. Starting lessons remain editable and yield to personal sound feedback. See [starter design](docs/BACKGROUND_STARTERS.md).

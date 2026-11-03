@@ -1,0 +1,17 @@
+[Unit]
+Description=Accent Coach single-instance web application
+After=network.target
+
+[Service]
+Type=simple
+User=accent-coach
+Group=accent-coach
+WorkingDirectory=/opt/accent-coach
+EnvironmentFile=/etc/accent-coach.env
+ExecStart=/opt/accent-coach/.venv/bin/python site_server.py
+Restart=on-failure
+TimeoutStopSec=240
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

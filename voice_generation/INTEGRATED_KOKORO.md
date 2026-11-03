@@ -1,6 +1,6 @@
 # Kokoro in the private practice website
 
-The combined demo branch `parth/demo-ready` includes the team practice site,
+The combined demo branch `profile-system` includes the team practice site,
 profile improvements and the isolated Kokoro connection. See
 [the combined guide](../docs/COMBINED_DEMO.md) for the current demo entry point.
 

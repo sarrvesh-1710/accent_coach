@@ -12,6 +12,7 @@ from starlette.exceptions import HTTPException
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.staticfiles import StaticFiles
 import uvicorn
+from server_config import load_server_config
 
 from site_pages import ASSETS, help_page, not_found_page, privacy_page, terms_page
 
@@ -56,12 +57,13 @@ def create_site(demo=None, theme=None, css=None, *, data_root=None, analyzer=Non
 
 
 def serve(demo=None, theme=None, css=None):
-    port = int(os.environ.get('GRADIO_SERVER_PORT', '7861'))
+    config=load_server_config()
+    port = config.port
     with socket.socket() as probe:
         if probe.connect_ex(('127.0.0.1', port)) == 0:
             raise SystemExit(f'Port {port} is already in use. Open http://127.0.0.1:{port}/ if Accent Coach is already running, or set GRADIO_SERVER_PORT to a free port.')
     site = create_site(demo, theme, css)
-    address = f'http://127.0.0.1:{port}/'
+    address = config.public_url+'/' if config.hosted else f'http://127.0.0.1:{port}/'
     def open_when_ready():
         for _ in range(30):
             try:
@@ -71,10 +73,11 @@ def serve(demo=None, theme=None, css=None):
                         return
             except OSError:
                 time.sleep(1)
-    if os.environ.get('ACCENT_COACH_OPEN_BROWSER', '1') == '1':
+    if not config.hosted and os.environ.get('ACCENT_COACH_OPEN_BROWSER', '1') == '1':
         threading.Thread(target=open_when_ready, daemon=True).start()
     print(f'Accent Coach: {address}', flush=True)
-    uvicorn.run(site, host='127.0.0.1', port=port, log_level='info')
+    uvicorn.run(site,host=config.bind_host,port=port,log_level='info',workers=1,
+                proxy_headers=True,forwarded_allow_ips=config.forwarded_allow_ips)
 
 
 if __name__ == '__main__':

@@ -12,6 +12,8 @@ sys.path.insert(0,str(ROOT))
 
 def seed(store):
     password='demo-practice-403!'
+    if not store.login('demo_starter',password):
+        store.register('demo_starter',password,'Starter Learner',background=dict(country='JP',language='',use_starters=True))
     owner=store.login('demo_learner',password)
     if owner:return
     owner=store.register('demo_learner',password,'Demo Learner')
@@ -46,6 +48,7 @@ def main():
     os.environ['GRADIO_SERVER_PORT']=str(args.port)
     os.environ['ACCENT_COACH_OPEN_BROWSER']='0' if args.no_browser else '1'
     print('Sample workspace only. Username: demo_learner  Password: demo-practice-403!',flush=True)
+    print('Use demo_starter with the same password for editable country-based starter lessons.',flush=True)
     print('Use demo_new with the same password to show the empty starting profile.',flush=True)
     from site_server import serve
     serve()

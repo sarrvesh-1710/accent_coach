@@ -19,6 +19,7 @@ import numpy as np
 import soundfile as sf
 
 from accounts.store import Store, GOALS
+from accounts.background import COUNTRIES, LANGUAGES, DEFAULT, validate_background
 from accounts.sessions import Conflict, Busy, PreparationError
 from accounts.practice_jobs import PracticeJobs
 from site_pages import ROOT, page_html
@@ -169,17 +170,29 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
                             (account_nav if user else '') + body, path)
         return content.replace('</head>', meta + '<link rel="stylesheet" href="/site-assets/accounts.css"><script src="/site-assets/accounts.js" defer></script></head>')
 
+    def background_fields(value):
+        countries='<option value="">Skip / prefer not to say</option>'+''.join(f'<option value="{code}" {"selected" if value["country"]==code else ""}>{html.escape(label)}</option>' for code,label in sorted(COUNTRIES.items(),key=lambda item:item[1]))
+        languages=''.join(f'<option value="{code}" {"selected" if value["language"]==code else ""}>{html.escape(label)}</option>' for code,label in LANGUAGES.items())
+        return f'''<fieldset id="background-preferences" class="background-preferences"><legend>Choose your starting lessons</legend>
+        <label for="origin-country">Country of origin (optional)</label><select id="origin-country" name="country" autocomplete="country">{countries}</select>
+        <label for="origin-language">Language background (optional)</label><select id="origin-language" name="language">{languages}</select>
+        <p id="origin-help">Countries include many languages. You can refine the suggestion with a language, choose another language / multilingual for a balanced start, or skip both questions.</p>
+        <input type="hidden" name="use_starters" value="0"><label class="background-toggle"><input id="origin-enabled" type="checkbox" name="use_starters" value="1" {"checked" if value['use_starters'] else ""}> Use background to suggest starting lessons</label>
+        <p>Your goals and personal results take priority. These suggestions do not label your ability or restrict any lessons. You can change or remove them later.</p></fieldset>'''
+
     def auth_page(request, signup=False, error='', status=200):
         token = request.cookies.get('accent_login_csrf') or secrets.token_urlsafe(32)
         if len(token) > 128:
             token = secrets.token_urlsafe(32)
         action, title = ('/signup', 'Create your account') if signup else ('/login', 'Sign in')
         name = '<label>Display name<input name="display_name" maxlength="60" autocomplete="name" required></label>' if signup else ''
+        background_html=background_fields(DEFAULT) if signup else ''
+        demo_hint='<p>Sample demo login: <strong>demo_starter</strong> / <strong>demo-practice-403!</strong>. Use demo_learner with the same password to see saved sample feedback.</p>' if os.environ.get('ACCENT_COACH_DEMO')=='1' else ''
         body = f'''<section class="account-card"><p class="eyebrow">Accent Coach</p><h1>{title}</h1>
         <p>Your profile, recordings and results are saved on this computer under your account.</p>
-        <p class="form-error" role="alert">{html.escape(error)}</p>
+        {demo_hint}<p class="form-error" role="alert">{html.escape(error)}</p>
         <form action="{action}" method="post" class="account-form">
-        <input type="hidden" name="csrf" value="{html.escape(token, quote=True)}">{name}
+        <input type="hidden" name="csrf" value="{html.escape(token, quote=True)}">{name}{background_html}
         <label>Username<input name="username" minlength="3" maxlength="32" pattern="[A-Za-z0-9_]+" autocomplete="username" required></label>
         <label>Password<input type="password" name="password" minlength="12" maxlength="128" autocomplete="{'new-password' if signup else 'current-password'}" required></label>
         <p>Use at least 12 characters for your password.</p><button class="primary">{title}</button></form>
@@ -213,7 +226,7 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
         if not store.throttle('ip:'+source) or not store.throttle('name:'+username.strip().lower()):
             return auth_page(request, signup, 'Too many sign-in attempts. Try again in 15 minutes.', 429)
         try:
-            owner = store.register(username, password, form.get('display_name', '')) if signup else store.login(username, password)
+            owner = store.register(username, password, form.get('display_name', ''),background=dict(country=form.get('country',''),language=form.get('language',''),use_starters=form.get('use_starters','1')=='1')) if signup else store.login(username, password)
         except ValueError as exc:
             return auth_page(request, signup, str(exc), 422)
         if owner is None:
@@ -261,17 +274,18 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
         user = current(request)
         if not user:
             return RedirectResponse('/login', status_code=303)
+        background_html=background_fields(store.background(user['id']))
         labels = {'TH': ('TH', 'think'), 'IH': ('IH', 'ship'), 'AE': ('AE', 'bad')}
         goals = ''.join(f'<label class="profile-goal"><input type="checkbox" name="goal" value="{g}" {"checked" if g in user["goals"] else ""}><span><strong>{labels[g][0]}</strong><span>as in {labels[g][1]}</span></span></label>' for g in GOALS)
         body = f'''<div class="profile-intro"><p class="eyebrow">Your learning preferences</p><h1>My profile</h1>
-        <p>Your practice, feedback and next steps in one place.</p></div>
+        <p>Your practice, feedback and next steps in one place. <a href="#background-preferences">Change starting lessons</a></p></div>
         <section class="account-card profile-card" aria-labelledby="progress-heading"><h2 id="progress-heading">My practice progress</h2><p id="progress-status" role="status">Loading your practice plan...</p><div id="profile-progress"></div></section>
         <section class="account-card profile-card"><header class="profile-header"><h2 id="profile-heading-name">{html.escape(user['display_name'])}</h2>
         <p>Username: <strong>{html.escape(user['username'])}</strong></p></header>
         <form id="profile-form" class="account-form profile-form">
         <label for="display-name">Display name<input id="display-name" name="display_name" value="{html.escape(user['display_name'], quote=True)}" maxlength="60" required autocomplete="nickname" aria-describedby="display-name-help"></label>
         <p id="display-name-help" class="profile-help">1–60 characters. This is the name shown when you sign in.</p>
-        <div class="profile-accent"><h3>Target accent</h3><p>General American English</p></div>
+        {background_html}<div class="profile-accent"><h3>Target accent</h3><p>General American English</p></div>
         <fieldset aria-describedby="profile-goals-help"><legend>Sounds I want to practice</legend>
         <div class="profile-goals">{goals}</div></fieldset>
         <p id="profile-goals-help" class="profile-help">Choose any sounds to focus on, or leave them unchecked for general practice. These preferences guide suggestions; they are not pronunciation results.</p>
@@ -302,10 +316,12 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
         csrf(request, request.headers.get('x-csrf-token'), user['csrf'])
         body = await json_body(request)
         try:
-            store.profile(user['id'], body.get('display_name'), body.get('goals'))
+            store.profile(user['id'], body.get('display_name'), body.get('goals'),**({'background':validate_background(body['background'])} if 'background' in body else {}))
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from None
-        return {'ok': True, 'profile': {'username': user['username'], 'display_name': body['display_name'].strip(), 'goals': list(dict.fromkeys(body['goals']))}}
+        saved={'username':user['username'],'display_name':body['display_name'].strip(),'goals':list(dict.fromkeys(body['goals']))}
+        if 'background' in body:saved['background']=store.background(user['id'])
+        return {'ok':True,'profile':saved}
 
     @site.get('/api/profile/progress')
     def progress_profile(request: Request):

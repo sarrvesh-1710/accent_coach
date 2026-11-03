@@ -1,6 +1,7 @@
 """Owner-scoped coaching summaries from saved, current analysis results."""
 from datetime import datetime, timezone
 import json
+from accounts.background import starter_plan
 
 SOUNDS={
  'TH':dict(word='think',tip='Let air flow gently with your tongue tip lightly between your teeth.'),
@@ -22,6 +23,8 @@ def profile_progress(store,owner,prompts,*,now=None):
             WHERE a.user_id=? AND a.deleted=0 AND (a.audio IS NOT NULL OR EXISTS
                 (SELECT 1 FROM practice_assets x WHERE x.attempt_id=a.id AND x.role='learner'))
             ORDER BY a.created DESC,a.id DESC LIMIT 100''',(owner,)).fetchall()
+    background=store.background(owner)
+    starter=starter_plan(background)
     counts={phone:[] for phone in SOUNDS}
     activities=[];analyzed=0;failed=0;generation=0;days=set()
     today=int(now//86400)
@@ -52,6 +55,7 @@ def profile_progress(store,owner,prompts,*,now=None):
             activities.append(dict(attempt_id=row['id'],sentence=row['sentence'],created=row['created'],
                 status='Analysis finished' if complete else 'Analysis could not finish' if failure else 'Awaiting analysis',
                 sounds=[dict(phone=p,outcome=o,label=LABELS[o]) for p,o in outcomes.items()]))
+    starter_active=not any(counts.values())
     sounds=[]
     for phone,spec in SOUNDS.items():
         recent=counts[phone];latest=recent[0] if recent else None
@@ -59,18 +63,21 @@ def profile_progress(store,owner,prompts,*,now=None):
                 'The latest check was inconclusive. Try a clear, short recording.' if latest=='inconclusive' else
                 'The latest model check favored the expected sound. Keep practicing in a new sentence.' if latest=='supported' else
                 'This is one of your selected goals. Start with a short sentence.' if phone in goals else
+                'An optional starting sound from your background preferences. Try it and let your own results guide the next step.' if starter_active and starter['tailored'] else
                 'No usable sound feedback yet. Try a first recording.')
         lesson=next((p for p in prompts if phone in p.get('target_phones',[])),None)
         sounds.append(dict(phone=phone,**spec,selected=phone in goals,latest=latest,label=LABELS.get(latest,'Not assessed yet'),
             observations=len(recent),practice=recent.count('practice'),supported=recent.count('supported'),
             inconclusive=recent.count('inconclusive'),reason=reason,lesson_id=lesson['id'] if lesson else None,
-            sentence=lesson['text'] if lesson else None))
-    ranked=sorted(sounds,key=lambda s:({'practice':0,'inconclusive':1,None:2,'supported':3}[s['latest']],not s['selected'],list(SOUNDS).index(s['phone'])))
+            sentence=lesson['text'] if lesson else None,
+            basis='personal_result' if latest else 'selected_goal' if phone in goals else 'background_starter' if starter_active and starter['tailored'] else 'exploration'))
+    ranked=sorted(sounds,key=lambda s:({'practice':0,'inconclusive':1,None:2,'supported':3}[s['latest']],not s['selected'],(starter['order'] if starter_active else list(SOUNDS)).index(s['phone'])))
     message=('Make your first recording to build your personal practice plan.' if not rows else
              'Your recordings are saved. Analyze one to get sound-specific feedback.' if not analyzed else
              'Your next practice is based on your latest sound checks and selected goals.')
     if failed and not analyzed:message='Some analyses could not finish. Retry a short preset lesson; saved recordings are still in History.'
     return dict(summary=message,recordings=len(rows),analyzed=analyzed,failed=failed,examples=generation,active_days_7= len(days),
         sounds=sounds,recommendations=ranked,activity=activities,
+        background=background,starter=dict(starter,active=starter_active),
         window='Based on your latest 100 saved recordings, with up to five current analysis results per sound. Active days use UTC.',
         note='Experimental model observations, not pronunciation grades or proof of improvement. Inconclusive checks are not errors.')

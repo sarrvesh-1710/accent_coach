@@ -3,12 +3,14 @@
   const form = document.getElementById('profile-form');
   if (!form) return;
   const name = document.getElementById('display-name');
+  const country=document.getElementById('origin-country'), language=document.getElementById('origin-language'), enabled=document.getElementById('origin-enabled');
+  const restoreBackground=value=>{country.value=value.country;language.value=value.language;enabled.checked=value.use_starters;};
   const goals = [...form.querySelectorAll('input[name="goal"]')];
   const save = document.getElementById('profile-save');
   const discard = document.getElementById('profile-discard');
   const status = document.getElementById('profile-status');
   const selection = document.getElementById('profile-selection');
-  const values = () => ({display_name:name.value, goals:goals.filter(node=>node.checked).map(node=>node.value)});
+  const values = () => ({display_name:name.value, goals:goals.filter(node=>node.checked).map(node=>node.value),background:{country:country.value,language:language.value,use_starters:enabled.checked}});
   let saved = values(), busy = false;
   const changed = () => JSON.stringify(values()) !== JSON.stringify(saved);
   function update() {
@@ -16,6 +18,7 @@
     save.disabled = busy || !dirty;
     discard.disabled = busy || !dirty;
     name.disabled = busy;
+    country.disabled=busy;language.disabled=busy;enabled.disabled=busy;
     goals.forEach(node=>{node.disabled=busy;node.closest('label').classList.toggle('is-selected',node.checked);});
     form.setAttribute('aria-busy',String(busy));
     selection.textContent = values().goals.length ? 'Practice focus: '+values().goals.join(', ')+'.' : 'Practice focus: general practice.';
@@ -31,6 +34,7 @@
   form.addEventListener('change',edited);
   discard.addEventListener('click',()=>{
     name.value=saved.display_name;
+    restoreBackground(saved.background);
     goals.forEach(node=>{node.checked=saved.goals.includes(node.value);});
     name.setCustomValidity('');
     status.classList.remove('form-error');
@@ -45,7 +49,8 @@
     busy=true;status.textContent='Saving your profile…';status.classList.remove('form-error');update();
     try {
       const response=await api('/api/profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-      saved={display_name:response.profile.display_name,goals:response.profile.goals};
+      saved={display_name:response.profile.display_name,goals:response.profile.goals,background:response.profile.background};
+      restoreBackground(saved.background);
       name.value=saved.display_name;
       goals.forEach(node=>{node.checked=saved.goals.includes(node.value);});
       document.getElementById('profile-heading-name').textContent=saved.display_name;
@@ -74,7 +79,15 @@ async function refreshProfileProgress(){
     for(const [label,value] of [['Saved recordings',data.recordings],['Analyzed recordings',data.analyzed],['Active days (last 7)',data.active_days_7],['Generated examples',data.examples]]){
       const card=element('div');card.append(element('strong',String(value)),element('span',label));stats.append(card);
     }
-    panel.append(stats,element('h3','Your next practice'));
+    panel.append(stats);
+    if(data.starter){
+      const starter=element('div',undefined,'profile-next');
+      starter.append(element('h3',data.starter.active ? data.starter.label : 'Your results now guide your practice'),element('p',data.starter.active ? data.starter.explanation : 'Your personal sound checks have replaced background-based ordering. Your country never limits what you can practice.'));
+      if(data.starter.active && data.starter.tailored && !data.background.language)starter.append(element('p','This language-based starter is suggested from your country choice. Choose your language below if it does not fit.'));
+      if(data.starter.active && data.starter.source){const source=element('a','About this starter research');source.href=data.starter.source;source.target='_blank';source.rel='noopener noreferrer';starter.append(source);}
+      const edit=element('a','Change or turn off starter suggestions');edit.href='#background-preferences';starter.append(element('p'),edit);panel.append(starter);
+    }
+    panel.append(element('h3','Your next practice'));
     const next=data.recommendations.find(item=>item.lesson_id);
     if(next){
       const card=element('article',undefined,'profile-next');

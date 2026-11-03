@@ -12,7 +12,7 @@ from phoneme_scoring.align_audio import load_settings
 
 
 def main():
-    files = [*ROOT.glob('*.ps1'), *(ROOT / 'accounts').glob('*.py'),
+    files = [*ROOT.glob('*.ps1'), *(ROOT / 'accounts').glob('*.py'), *(ROOT / 'accounts').glob('*.json'),
              *(ROOT / 'voice_generation').glob('*.py'),
              *[p for p in (ROOT / 'voice_generation/panel').rglob('*') if p.is_file()],
              *ROOT.glob('*.py'), *ROOT.glob('*.json'), *ROOT.glob('requirements*.txt'),

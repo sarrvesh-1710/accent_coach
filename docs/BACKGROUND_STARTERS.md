@@ -1,63 +1,58 @@
-# Optional background starter design
+# Optional language starter design
 
-Country of origin is an optional user-entered context, not a diagnosis, language
-identifier, ethnicity classifier or scoring input. Countries contain many language
-communities; the optional language selector always overrides the country shortcut.
-Names come from a static snapshot of 244 Windows/.NET region names, plus an
-Other / multiple countries choice. No runtime country lookup or new package is
-required. Blank/omitted fields remain valid.
+The user can choose Arabic, Hindi, Japanese, Mandarin Chinese or Spanish at
+signup or in My profile. Skip, another language / multilingual and opt-out all
+produce a balanced TH/IH/AE starter. Country is not collected or inferred.
 
-## Current starter catalog
+## Initial starter catalog
 
-These are editorial lesson-order choices grounded in language research, not a
-validated ranking of the most common errors by country. The three existing target
-sounds remain available to everyone and no measurements are manufactured.
+The order is an editorial choice for introductory listening/recording exercises,
+not a validated ranking of errors or a prediction about an individual.
 
-- Spanish background: IH, AE, TH. Spanish-language study motivates exploring the
-  English /i/-/I/ contrast; the other sounds remain introductory checks.
-- Japanese background: AE, IH, TH. Japanese learner research motivates exploring
-  the /ae/ vowel. Remaining sounds are introductory checks.
-- Mandarin background: TH, IH, AE. Mandarin learner fricative research motivates
-  exploring TH. Remaining sounds are introductory checks.
-- Other languages/countries, English, skipped questions and opt-out: balanced
-  TH, IH, AE. Unsupported country packs are not invented.
+- Arabic: IH, AE, TH. Begin by exploring English vowel contrasts.
+- Hindi: TH, AE, IH. Explore the fricative in think versus a stopped consonant.
+- Japanese: AE, IH, TH. Explore the vowel in bad.
+- Mandarin Chinese: TH, IH, AE. Explore the dental fricative in think.
+- Spanish: IH, AE, TH. Explore the vowel contrast in ship/sheep.
 
-The country-to-pack shortcuts in `accounts/background.py` are tentative language
-suggestions for countries associated with those language backgrounds, not evidence
-that an individual speaks that language. An explicit language or multilingual
-choice overrides the shortcut. These defaults need user evaluation before claims
-about educational effectiveness.
+Only the three existing sound contrasts are assessed. These profiles do not add
+new phoneme models or grading capabilities. Dialects, experience and multilingual
+backgrounds vary; every sound and lesson remains available to every user.
 
 ## Adaptation and user control
 
-Personal results are computed from the signed-in owner's current saved analyses.
-When any current sound observation exists, all background tie-breaks are disabled.
-Within the existing feedback priority (possible substitution, uncertain, untested,
-expected-supported), selected sound goals take priority; background is used only
-to break remaining ties for a new learner. No lesson is locked or filtered out.
-Removing/deleting all current feedback permits a starter plan again. Historical
-invalidated or deleted results are not retained as hidden demographic evidence.
+The signed-in owner's current saved results determine personal coaching. Once any
+current sound observation exists, language-based tie-breaks are disabled. Within
+the feedback priority (possible substitution, uncertain, untested,
+expected-supported), selected goals take priority over starter ordering.
+Deleting or invalidating all current feedback allows a starter plan again;
+removed results are never retained as hidden evidence. Preferences are optional,
+editable and removable, with visible save/discard controls.
 
-Country and language persist separately in an additive `learning_preferences`
-table. The existing users table and password hashes are untouched. Invalid input
-rejects the whole profile update. Existing clients omitting the new background
-field retain their previous values. Only authenticated owner-scoped profile routes
-read or modify these preferences, with the existing CSRF checks for writes.
+An additive learning_preferences table retains its old country column for schema
+compatibility. The app never reads it for profiles or recommendations, writes an
+empty string on preference saves, and never infers a language from it. Explicit
+saved language choices survive this change; the earlier English/balanced choice
+maps to another language / multilingual. Existing clients can omit background to
+preserve saved preferences. Authenticated ownership, CSRF and atomic validation
+remain in place. The profile API exposes only language and use_starters for the
+background. The obsolete country-name dataset has been removed.
 
-## Primary references
+## Primary research and teaching references
 
-- ASHA, Accent Modification: first-language influence and individualized assessment:
+These motivate topics to explore, not demographic error probabilities or this
+app's efficacy. Some studies use British English; they do not validate this app's
+General American feedback or the complete starter ordering.
+
+- General language influence and individualized assessment:
   https://www.asha.org/practice-portal/professional-issues/accent-modification/
-- When the Easy Becomes Difficult: Factors Affecting the Acquisition
-  of the English /i:/-/I/ Contrast (2021):
+- Spanish, English /i:/-/I/ acquisition:
   https://www.frontiersin.org/journals/communication/articles/10.3389/fcomm.2021.660917/full
-- Lambacher et al., identification/production training of American English vowels
-  by native Japanese speakers (2005):
+- Japanese, American English vowel training:
   https://www.cambridge.org/core/journals/applied-psycholinguistics/article/abs/effects-of-identification-training-on-the-identification-and-production-of-american-english-vowels-by-native-speakers-of-japanese/69DD247F62AD56AF41AE3EBBE43FDAAC
-- Acquisition of non-sibilant anterior English fricatives by adult second language
-  learners (2021), Mandarin-English speakers:
+- Mandarin-English fricative acquisition:
   https://benjamins.com/catalog/jslp.20067.wie
-
-These studies concern language groups and particular tasks. They do not validate
-country-based individual error predictions, this app's starter ordering, or the
-app's pronunciation feedback accuracy.
+- Arabic learners, English vowel/consonant perception and production:
+  https://discovery.ucl.ac.uk/10044993/
+- Hindi dental stops and the English th sounds, Indiana University teaching text:
+  https://iu.pressbooks.pub/hindiscript/chapter/5-1-discussion/

@@ -19,7 +19,7 @@ import numpy as np
 import soundfile as sf
 
 from accounts.store import Store, GOALS
-from accounts.background import COUNTRIES, LANGUAGES, DEFAULT, validate_background
+from accounts.background import LANGUAGES, DEFAULT, validate_background
 from accounts.sessions import Conflict, Busy, PreparationError
 from accounts.practice_jobs import PracticeJobs
 from site_pages import ROOT, page_html
@@ -171,13 +171,11 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
         return content.replace('</head>', meta + '<link rel="stylesheet" href="/site-assets/accounts.css"><script src="/site-assets/accounts.js" defer></script></head>')
 
     def background_fields(value):
-        countries='<option value="">Skip / prefer not to say</option>'+''.join(f'<option value="{code}" {"selected" if value["country"]==code else ""}>{html.escape(label)}</option>' for code,label in sorted(COUNTRIES.items(),key=lambda item:item[1]))
         languages=''.join(f'<option value="{code}" {"selected" if value["language"]==code else ""}>{html.escape(label)}</option>' for code,label in LANGUAGES.items())
         return f'''<fieldset id="background-preferences" class="background-preferences"><legend>Choose your starting lessons</legend>
-        <label for="origin-country">Country of origin (optional)</label><select id="origin-country" name="country" autocomplete="country">{countries}</select>
-        <label for="origin-language">Language background (optional)</label><select id="origin-language" name="language">{languages}</select>
-        <p id="origin-help">Countries include many languages. You can refine the suggestion with a language, choose another language / multilingual for a balanced start, or skip both questions.</p>
-        <input type="hidden" name="use_starters" value="0"><label class="background-toggle"><input id="origin-enabled" type="checkbox" name="use_starters" value="1" {"checked" if value['use_starters'] else ""}> Use background to suggest starting lessons</label>
+        <label for="origin-language">Language of origin (optional)</label><select id="origin-language" name="language">{languages}</select>
+        <p id="origin-help">Choose a language you grew up speaking or use most. Skip this question or choose another language / multilingual for a balanced start.</p>
+        <input type="hidden" name="use_starters" value="0"><label class="background-toggle"><input id="origin-enabled" type="checkbox" name="use_starters" value="1" {"checked" if value['use_starters'] else ""}> Use my language to suggest starting lessons</label>
         <p>Your goals and personal results take priority. These suggestions do not label your ability or restrict any lessons. You can change or remove them later.</p></fieldset>'''
 
     def auth_page(request, signup=False, error='', status=200):
@@ -226,7 +224,7 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
         if not store.throttle('ip:'+source) or not store.throttle('name:'+username.strip().lower()):
             return auth_page(request, signup, 'Too many sign-in attempts. Try again in 15 minutes.', 429)
         try:
-            owner = store.register(username, password, form.get('display_name', ''),background=dict(country=form.get('country',''),language=form.get('language',''),use_starters=form.get('use_starters','1')=='1')) if signup else store.login(username, password)
+            owner = store.register(username, password, form.get('display_name', ''),background=dict(language=form.get('language',''),use_starters=form.get('use_starters','1')=='1')) if signup else store.login(username, password)
         except ValueError as exc:
             return auth_page(request, signup, str(exc), 422)
         if owner is None:

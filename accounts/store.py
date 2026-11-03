@@ -152,13 +152,13 @@ class Store(SessionMethods):
 
     def background(self,owner):
         with self.connect() as db:
-            row=db.execute('SELECT country,language,use_starters FROM learning_preferences WHERE user_id=?',(owner,)).fetchone()
-        return dict(country=row['country'],language=row['language'],use_starters=bool(row['use_starters'])) if row else dict(DEFAULT)
+            row=db.execute('SELECT language,use_starters FROM learning_preferences WHERE user_id=?',(owner,)).fetchone()
+        return dict(language='other' if row['language']=='english' else row['language'],use_starters=bool(row['use_starters'])) if row else dict(DEFAULT)
 
     @staticmethod
     def _write_background(db,owner,value):
         db.execute('INSERT INTO learning_preferences VALUES (?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET country=excluded.country,language=excluded.language,use_starters=excluded.use_starters',
-            (owner,value['country'],value['language'],int(value['use_starters'])))
+            (owner,'',value['language'],int(value['use_starters'])))
 
     def profile(self, owner, display_name, goals, *, background=None):
         if background is not None:background=validate_background(background)

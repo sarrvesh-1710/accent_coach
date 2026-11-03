@@ -4,42 +4,38 @@ Branch: `parth/demo-ready`. This combines the integrated team practice site,
 Parth's profile improvements, and the isolated private Kokoro adapter. Teammate
 branches and `main` are unchanged. This is a local presentation build.
 
-## Country and language starter demo: November 3, 2026
+## Five-language starter demo: November 3, 2026
 
 Launch the sample demo as below and sign in as `demo_starter` with password
-`demo-practice-403!`. This fresh account has no invented sound results. It starts
-with Japan selected as an illustrative preference, not a claim about the presenter.
+`demo-practice-403!`. This fresh account has no invented sound results.
 
 1. Open My profile and use **Change starting lessons**.
-2. Select Japan, leave language at **Use country starter suggestion**, and save.
-   The Japanese-language starter offers AE / bad first.
-3. Change country to Mexico and save. The Spanish-language starter offers IH / ship.
-4. Set language to Japanese while keeping Mexico: the explicit language wins.
-5. Turn off **Use background to suggest starting lessons** to return to a balanced
-   starter. All 12 lessons remain available in every case.
-6. Choose a sound goal to override the starter tie-break. Record and analyze a
-   lesson to begin personal feedback. Once there is current sound feedback,
-   background ordering is completely removed; personal results guide practice.
-7. Reload to show saved preferences. Clear country/language to remove them.
+2. Choose Japanese under **Language of origin (optional)**, and save. The starter
+   offers AE / bad first. Change to Spanish to see IH / ship first.
+3. Try Hindi or Mandarin Chinese to start with TH / think, or Arabic to explore
+   the IH / ship vowel. These are introductory suggestions, not predicted errors.
+4. Turn off **Use my language to suggest starting lessons**, skip the language, or
+   choose **Another language / multilingual** for a balanced check.
+5. Choose a sound goal to override starter ordering. Record and analyze a lesson
+   to begin personal feedback. Once current sound feedback exists, language
+   ordering is removed and personal results guide practice.
+6. Reload to show saved preferences. Use Discard changes to cancel an unsaved edit.
 
-New users can make the same optional choices during signup. Existing accounts get
-blank preferences without changing names, passwords, recordings or analysis.
-The legacy profile API remains compatible: updates without a background field
-preserve existing background preferences. Country data stays local and is not sent
-to the pronunciation or synthesis models. Local database backups were saved under
-ignored `runs/` before the new preferences table was initialized.
+The five starter languages are Arabic, Hindi, Japanese, Mandarin Chinese and
+Spanish. Everyone can access all 12 lessons and all TH/IH/AE sound checks. Country
+is no longer collected, returned in profiles, or used to infer a language. Existing
+stored language choices are preserved; an old country choice never gets converted
+to a language. The old country database column remains only for schema
+compatibility and is cleared when background preferences are saved.
 
-The initial researched starter catalog is deliberately limited to Spanish,
-Japanese and Mandarin backgrounds. Certain country selections tentatively suggest
-one of these packs; country is not treated as proof of language. All other
-countries, explicit English/another-language choices and opt-out use the balanced
-TH/IH/AE check. No country-specific error rates or individual probabilities are
-estimated. This release changes lesson ordering only, not scores or model evidence.
+Signup offers the same optional language field. The legacy profile API is
+compatible: updates omitting background preserve existing preferences. No language
+value is passed to the pronunciation or synthesis models, and scores are unchanged.
+See [starter design and research](BACKGROUND_STARTERS.md).
 
-See [starter design and sources](BACKGROUND_STARTERS.md) for coverage and expansion.
-Verification: all 180 tests ran, 179 passed, one existing Windows symlink skip;
-six new background tests and the focused profile checks passed. Browser checks
-verified country changes, opt-out, saving, and persistence after reload.
+Verification: 181 tests ran, 180 passed, one existing Windows symlink skip.
+Browser checks verified all five language choices, no country control, saving
+Arabic, persistence after reload, and a 390px layout without horizontal overflow.
 
 ## Show the personalized profile immediately
 

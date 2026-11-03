@@ -1,6 +1,6 @@
 # Combined local demo
 
-**Country-based starters:** sign in to the demo as `demo_starter` / `demo-practice-403!`. Signup and My profile now offer optional country/language choices. Starting lessons are tentative, editable, and replaced by personal sound feedback. See [starter design](docs/BACKGROUND_STARTERS.md).
+**Language starters:** sign in to the demo as `demo_starter` / `demo-practice-403!`. Signup and My profile offer five optional language backgrounds: Arabic, Hindi, Japanese, Mandarin Chinese and Spanish. Country is not collected or used. Starting lessons remain editable and yield to personal sound feedback. See [starter design](docs/BACKGROUND_STARTERS.md).
 
 **Personalized profile demo:** run `powershell -ExecutionPolicy Bypass -File .\start_demo.ps1 -Demo`, open http://127.0.0.1:7864/profile, and sign in as `demo_learner` / `demo-practice-403!`. Sample history is clearly labeled and stored separately from personal data. Profiles now turn saved practice results into sound feedback and recommended lessons.
 

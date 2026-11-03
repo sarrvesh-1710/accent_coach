@@ -69,6 +69,13 @@ async function showAttempt(id) {
       panel.append(element('p', error.message, 'form-error'));
     }), 1500);
   } else if ($('suggestions')) {
+    if(typeof refreshLessonPlan==='function'){
+      const plan=await refreshLessonPlan();
+      if(plan?.started && plan.next){
+        const next=element('a',(plan.next.lesson_id===attempt.prompt_id ? 'Retry this sentence: ' : 'Continue to sentence '+plan.next.number+': ')+plan.next.sentence,'button primary');
+        next.href='/practice?lesson='+encodeURIComponent(plan.next.lesson_id)+'&plan=1';panel.append(next);
+      }else if(plan?.complete)panel.append(element('p','All sentences in your lesson plan have been practiced.'));
+    }
     await suggestions();
   }
 }
@@ -186,7 +193,7 @@ if ($('lesson')) {
   $('lesson').addEventListener('change', () => {
     wav = null; $('preview').hidden = true; $('preview').removeAttribute('src'); $('preview').load(); $('recording-file').value = ''; $('analyze').disabled = true;
     if (previewUrl) { URL.revokeObjectURL(previewUrl); previewUrl = null; }
-    selectLesson(); $('practice-status').textContent = 'Record the new sentence before checking.';
+    selectLesson(); if(typeof refreshLessonPlan==='function')refreshLessonPlan(); $('practice-status').textContent = 'Record the new sentence before checking.';
   });
   $('input-mode').addEventListener('change', () => {
     const preset = $('input-mode').value === 'preset';
@@ -195,8 +202,19 @@ if ($('lesson')) {
     $('analyze').textContent = preset ? 'Check and save my recording' : 'Save and transcribe my recording';
     clearTimeout(sessionTimer); sessionId = null;
     $('session-panel').hidden = true;
+    if(typeof refreshLessonPlan==='function')refreshLessonPlan();
   });
-  api('/api/lessons').then(data => {lessons = data; const requested=new URLSearchParams(location.search).get('lesson');if(lessons.some(p=>p.id===requested))$('lesson').value=requested;selectLesson();}).catch(error => {$('practice-status').textContent = error.message;});
+  api('/api/lessons').then(async data => {
+    lessons=data;
+    const requested=new URLSearchParams(location.search).get('lesson');
+    if(lessons.some(p=>p.id===requested))$('lesson').value=requested;
+    else if(!wav && recorder?.state!=='recording'){
+      const plan=await api('/api/lesson-plan');
+      if(plan.next && lessons.some(p=>p.id===plan.next.lesson_id))$('lesson').value=plan.next.lesson_id;
+    }
+    selectLesson();
+    if(typeof refreshLessonPlan==='function')refreshLessonPlan();
+  }).catch(error=>{$('practice-status').textContent=error.message;});
   suggestions().catch(() => {});
   window.addEventListener('pagehide', () => {stopMicrophone(); if (previewUrl) URL.revokeObjectURL(previewUrl);});
 }

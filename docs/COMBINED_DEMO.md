@@ -4,6 +4,26 @@ Branch: `profile-system`. This combines the integrated team practice site,
 Parth's profile improvements, and the isolated private Kokoro adapter. Teammate
 branches and `main` are unchanged. This is a local presentation build.
 
+## Ordered lesson-plan demo
+
+Sign in as `demo_starter` with the existing demo password. Open Practice or My
+profile and find **My lesson plan**. The plan shows three sound lessons, four
+sentences each, an overall practice count, and the next sentence.
+
+1. Press **Start lesson plan**. This saves the sequence and opens its first sentence.
+2. Use **Go to recording**, record up to five seconds and press **Check and save my
+   recording**. After analysis finishes, the result offers Continue to the next
+   sentence. Failed processing leaves the same step available for retry.
+3. Expand **See the ordered sentences** to show all three lessons and their fixed
+   order, including Next / Upcoming / Practiced labels.
+4. Return to My profile or restart the app: the sequence and progress persist.
+5. After all twelve sentences have been practiced, review suggestions are based on
+   the current sound feedback. Starting a new plan applies current preferences
+   with explicit confirmation; saved recordings and History are retained.
+
+See [lesson-plan behavior](LESSON_PLAN.md). Completing an exercise is practice
+progress, not a pronunciation pass, mastery claim or grade.
+
 ## Five-language starter demo: November 3, 2026
 
 Launch the sample demo as below and sign in as `demo_starter` with password

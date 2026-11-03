@@ -55,3 +55,25 @@ transfer the old accounts automatically. See SERVER_DEPLOYMENT.md.
 Observations and counts are experimental model evidence, not validated grades,
 clinical assessments or proof of improvement. The starter research and its limits
 are documented in BACKGROUND_STARTERS.md.
+
+## Structured sentence plan
+
+My profile and Practice also offer a three-lesson, twelve-sentence course.
+Before starting, its order previews the current recommendations. Starting saves a
+snapshot of that order. Personal feedback and selected goals determine the sound
+order when available; otherwise the optional language starter supplies the order.
+Each sound has four preset sentence variations. The sequence stays fixed while
+practicing, so it does not jump around after each new result. Optional review
+recommendations continue adapting separately. All sentences remain freely usable.
+
+Plan progress is recorded in the same transaction as a completed preset analysis.
+Inconclusive but completed sound analysis counts as practice, not mastery. Failed
+or unavailable processing does not advance. Only new recordings made after plan
+start count. Free-speech/custom-text jobs, generated examples, old attempts and
+other users do not fill the preset course. Removing all credited recordings for a
+sentence removes its credit. Starting a new plan explicitly resets its progress,
+applies current preferences/feedback, and retains recording History.
+
+The additional lesson_plans and lesson_plan_steps tables live in the same private
+SQLite database and move with the account data. No browser-local progress or
+server-specific path is used. See LESSON_PLAN.md for the demonstration.

@@ -44,6 +44,12 @@ class Store(SessionMethods):
                 CREATE TABLE IF NOT EXISTS learning_preferences (
                     user_id TEXT PRIMARY KEY REFERENCES users(id), country TEXT NOT NULL DEFAULT '',
                     language TEXT NOT NULL DEFAULT '', use_starters INTEGER NOT NULL DEFAULT 1);
+                CREATE TABLE IF NOT EXISTS lesson_plans (
+                    user_id TEXT PRIMARY KEY REFERENCES users(id), body TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS lesson_plan_steps (
+                    user_id TEXT NOT NULL REFERENCES users(id), plan_id TEXT NOT NULL,
+                    prompt_id TEXT NOT NULL, attempt_id TEXT NOT NULL REFERENCES attempts(id),
+                    PRIMARY KEY(user_id,plan_id,prompt_id,attempt_id));
                 CREATE TABLE IF NOT EXISTS auth_limits (
                     key TEXT PRIMARY KEY, started REAL NOT NULL, count INTEGER NOT NULL);
             ''')
@@ -209,9 +215,13 @@ class Store(SessionMethods):
         message = error or ('Processing failed. Your recording is saved; check the result for details.' if status == 'failed'
                             else 'Analysis finished. Recording and results are saved to your account.')
         with self.connect() as db:
-            return db.execute("""UPDATE attempts SET status=?,message=?,result=? WHERE id=? AND user_id=?
+            changed = db.execute("""UPDATE attempts SET status=?,message=?,result=? WHERE id=? AND user_id=?
                 AND deleted=0 AND status IN ('queued','processing')""",
                 (status, message, json.dumps(result, ensure_ascii=False, allow_nan=False) if result else None, identity, owner)).rowcount == 1
+            if changed and status=='completed':
+                from accounts.lesson_plan import record_completion
+                record_completion(db,owner,identity,result)
+            return changed
 
     def delete_attempt(self, owner, identity):
         with self.connect() as db:

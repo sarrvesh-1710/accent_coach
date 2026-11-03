@@ -58,6 +58,7 @@
       if(signedIn)signedIn.textContent='Signed in as '+saved.display_name;
       status.textContent='Profile saved. Your preferences will guide practice suggestions.';
       await refreshProfileProgress();
+      if(typeof refreshLessonPlan==='function')await refreshLessonPlan();
     } catch(error) {
       status.classList.add('form-error');
       status.textContent=error instanceof TypeError ? 'Could not save your profile. Check the connection and try again.' : error.message;
@@ -86,7 +87,7 @@ async function refreshProfileProgress(){
       if(data.starter.active && data.starter.source){const source=element('a','About this starter research');source.href=data.starter.source;source.target='_blank';source.rel='noopener noreferrer';starter.append(source);}
       const edit=element('a','Change or turn off starter suggestions');edit.href='#background-preferences';starter.append(element('p'),edit);panel.append(starter);
     }
-    panel.append(element('h3','Your next practice'));
+    panel.append(element('h3','Optional sound review'));
     const next=data.recommendations.find(item=>item.lesson_id);
     if(next){
       const card=element('article',undefined,'profile-next');

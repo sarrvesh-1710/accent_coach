@@ -1,3 +1,7 @@
+# Structured lesson plan
+
+My profile and Practice now include a saved, ordered plan: three sound lessons with four sentences each. Start a plan, record the current sentence, review its analysis, then continue to the next sentence. See [the lesson-plan guide](docs/LESSON_PLAN.md).
+
 # Profile system and server handoff
 
 Active branch: `profile-system`. See [how profiles adapt](docs/PROFILE_SYSTEM.md) and [the server migration guide](docs/SERVER_DEPLOYMENT.md). Local demo commands below still work.

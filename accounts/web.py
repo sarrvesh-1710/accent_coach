@@ -2,6 +2,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 import html
+import hashlib
 import io
 import json
 import logging
@@ -95,6 +96,7 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
         from pipeline import load_prompts
         prompts = load_prompts()
     config=load_server_config()
+    asset_version=hashlib.sha256(b''.join((ROOT/'web_assets'/name).read_bytes() for name in ('accounts.js','accounts.css','profile.js','profile.css','lesson_plan.js'))).hexdigest()[:12]
     catalog = {p['id']: p for p in prompts}
     store = Store(data_root or config.data_dir)
     jobs = Jobs(store, analyzer)
@@ -173,7 +175,7 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
         meta = f'<meta name="csrf-token" content="{html.escape(user["csrf"] if user else (token or ""), quote=True)}">'
         content = page_html(title, 'Private English pronunciation practice and saved recordings.',
                             (account_nav if user else '') + body, path)
-        return content.replace('</head>', meta + '<link rel="stylesheet" href="/site-assets/accounts.css"><script src="/site-assets/accounts.js" defer></script></head>')
+        return content.replace('</head>', meta + f'<link rel="stylesheet" href="/site-assets/accounts.css?v={asset_version}"><script src="/site-assets/accounts.js?v={asset_version}" defer></script><script src="/site-assets/lesson_plan.js?v={asset_version}" defer></script></head>')
 
     def background_fields(value):
         languages=''.join(f'<option value="{code}" {"selected" if value["language"]==code else ""}>{html.escape(label)}</option>' for code,label in LANGUAGES.items())
@@ -258,7 +260,7 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
         if not user:
             return RedirectResponse('/login', status_code=303)
         options = ''.join(f'<option value="{html.escape(p["id"], quote=True)}">{html.escape(p["text"])}</option>' for p in prompts)
-        body = f'''<h1>Practice English pronunciation.</h1><p>Choose a sentence, record up to five seconds, then review your saved result.</p>
+        body = f'''<h1>Practice English pronunciation.</h1><p>Follow your lesson plan below, or choose any sentence freely. Record up to five seconds, then review your saved result.</p><section class="account-card" aria-labelledby="lesson-plan-heading"><h2 id="lesson-plan-heading">My lesson plan</h2><div id="lesson-plan" aria-live="polite">Loading your sentence sequence...</div></section>
         <section class="account-card"><label for="input-mode">Practice mode</label><select id="input-mode"><option value="preset">Preset lesson</option><option value="custom_text">My own sentence</option><option value="free_speech">Free speech</option></select>
         <label for="lesson">Practice sentence</label><select id="lesson">{options}</select>
         <label id="custom-label" hidden>My sentence (up to 12 words and 200 characters)<textarea id="custom-text" maxlength="200" rows="3"></textarea></label>
@@ -269,7 +271,7 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
         <p id="practice-status" role="status" aria-live="polite">Your recordings and results will appear in My history.</p></section>
         <section id="attempt-result" class="account-card" hidden></section>
         <section id="session-panel" class="account-card" hidden></section>
-        <section class="account-card"><h2>Practice next</h2><p id="suggestions">Set your practice goals in My profile.</p></section>'''
+        <section class="account-card"><h2>Optional sound review</h2><p id="suggestions">Set your practice goals in My profile.</p></section>'''
         return HTMLResponse(shell('English pronunciation practice', body, '/practice', user))
 
     @site.get('/profile')
@@ -282,6 +284,7 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
         goals = ''.join(f'<label class="profile-goal"><input type="checkbox" name="goal" value="{g}" {"checked" if g in user["goals"] else ""}><span><strong>{labels[g][0]}</strong><span>as in {labels[g][1]}</span></span></label>' for g in GOALS)
         body = f'''<div class="profile-intro"><p class="eyebrow">Your learning preferences</p><h1>My profile</h1>
         <p>Your practice, feedback and next steps in one place. <a href="#background-preferences">Change starting lessons</a></p></div>
+        <section class="account-card profile-card" aria-labelledby="lesson-plan-heading"><h2 id="lesson-plan-heading">My lesson plan</h2><div id="lesson-plan" aria-live="polite">Loading your sentence sequence...</div></section>
         <section class="account-card profile-card" aria-labelledby="progress-heading"><h2 id="progress-heading">My practice progress</h2><p id="progress-status" role="status">Loading your practice plan...</p><div id="profile-progress"></div></section>
         <section class="account-card profile-card"><header class="profile-header"><h2 id="profile-heading-name">{html.escape(user['display_name'])}</h2>
         <p>Username: <strong>{html.escape(user['username'])}</strong></p></header>
@@ -296,7 +299,7 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
         <div class="profile-actions"><button id="profile-save" class="primary" disabled>Save changes</button><button id="profile-discard" type="button" disabled>Discard changes</button></div>
         <p id="profile-status" role="status" aria-live="polite">Your profile is up to date.</p></form></section>'''
         page = shell('My profile', body, '/profile', user)
-        return HTMLResponse(page.replace('</head>', '<link rel="stylesheet" href="/site-assets/profile.css"><script src="/site-assets/profile.js" defer></script></head>'))
+        return HTMLResponse(page.replace('</head>', f'<link rel="stylesheet" href="/site-assets/profile.css?v={asset_version}"><script src="/site-assets/profile.js?v={asset_version}" defer></script></head>'))
 
     @site.get('/history')
     def history_page(request: Request):
@@ -330,6 +333,28 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
     def progress_profile(request: Request):
         from accounts.coaching import profile_progress
         return profile_progress(store,require(request)['id'],prompts)
+
+    @site.get('/api/lesson-plan')
+    def lesson_plan(request:Request):
+        from accounts.lesson_plan import get_plan
+        return get_plan(store,require(request)['id'],prompts)
+
+    @site.post('/api/lesson-plan/start')
+    async def begin_plan(request:Request):
+        from accounts.lesson_plan import start_plan,get_plan
+        user=require(request);csrf(request,request.headers.get('x-csrf-token'),user['csrf'])
+        try:start_plan(store,user['id'],prompts)
+        except ValueError as exc:raise HTTPException(422,str(exc)) from None
+        return get_plan(store,user['id'],prompts)
+
+    @site.post('/api/lesson-plan/restart')
+    async def restart_plan(request:Request):
+        from accounts.lesson_plan import start_plan,get_plan
+        user=require(request);csrf(request,request.headers.get('x-csrf-token'),user['csrf'])
+        if (await json_body(request)).get('restart') is not True:raise HTTPException(422,'Confirm starting a new plan.')
+        try:start_plan(store,user['id'],prompts,restart=True)
+        except ValueError as exc:raise HTTPException(422,str(exc)) from None
+        return get_plan(store,user['id'],prompts)
 
     @site.get('/api/lessons')
     def lessons(request: Request):

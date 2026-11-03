@@ -96,7 +96,7 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
         from pipeline import load_prompts
         prompts = load_prompts()
     config=load_server_config()
-    asset_version=hashlib.sha256(b''.join((ROOT/'web_assets'/name).read_bytes() for name in ('accounts.js','accounts.css','profile.js','profile.css','lesson_plan.js'))).hexdigest()[:12]
+    asset_version=hashlib.sha256(b''.join((ROOT/'web_assets'/name).read_bytes() for name in ('accounts.js','accounts.css','profile.js','profile.css','lesson_plan.js','microphone.js'))).hexdigest()[:12]
     catalog = {p['id']: p for p in prompts}
     store = Store(data_root or config.data_dir)
     jobs = Jobs(store, analyzer)
@@ -175,7 +175,7 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
         meta = f'<meta name="csrf-token" content="{html.escape(user["csrf"] if user else (token or ""), quote=True)}">'
         content = page_html(title, 'Private English pronunciation practice and saved recordings.',
                             (account_nav if user else '') + body, path)
-        return content.replace('</head>', meta + f'<link rel="stylesheet" href="/site-assets/accounts.css?v={asset_version}"><script src="/site-assets/accounts.js?v={asset_version}" defer></script><script src="/site-assets/lesson_plan.js?v={asset_version}" defer></script></head>')
+        return content.replace('</head>', meta + f'<link rel="stylesheet" href="/site-assets/accounts.css?v={asset_version}"><script src="/site-assets/microphone.js?v={asset_version}" defer></script><script src="/site-assets/accounts.js?v={asset_version}" defer></script><script src="/site-assets/lesson_plan.js?v={asset_version}" defer></script></head>')
 
     def background_fields(value):
         languages=''.join(f'<option value="{code}" {"selected" if value["language"]==code else ""}>{html.escape(label)}</option>' for code,label in LANGUAGES.items())
@@ -266,8 +266,9 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
         <label id="custom-label" hidden>My sentence (up to 12 words and 200 characters)<textarea id="custom-text" maxlength="200" rows="3"></textarea></label>
         <p id="lesson-hint"></p><audio id="example" controls></audio><p>Synthetic listening example; not used to score your voice.</p>
         <div class="record-actions"><button id="record">Record my voice</button><button id="stop" disabled>Stop recording</button></div>
+        <div id="mic-meter" class="mic-meter" hidden><label for="mic-level">Microphone input level</label><meter id="mic-level" min="0" max="1" value="0" aria-describedby="mic-feedback"></meter><p id="mic-feedback" role="status">Listening for sound...</p><p id="mic-time" aria-live="off"></p><small>This shows incoming sound, not speech recognition. Nothing is uploaded while recording.</small></div>
         <label>Or upload a WAV<input id="recording-file" type="file" accept=".wav,audio/wav"></label>
-        <audio id="preview" controls hidden></audio><button id="analyze" class="primary" disabled>Check and save my recording</button>
+        <section id="recording-review" class="recording-review" hidden aria-labelledby="recording-review-heading"><h3 id="recording-review-heading">Review your recording</h3><p>Not saved yet. Listen to the playback, then confirm or record again.</p><audio id="preview" controls></audio><div class="record-actions"><button id="record-again" type="button">Record again</button><button id="discard-recording" type="button">Discard recording</button><button id="analyze" class="primary" disabled>Confirm and analyze</button></div></section>
         <p id="practice-status" role="status" aria-live="polite">Your recordings and results will appear in My history.</p></section>
         <section id="attempt-result" class="account-card" hidden></section>
         <section id="session-panel" class="account-card" hidden></section>

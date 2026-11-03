@@ -11,8 +11,9 @@ profile and find **My lesson plan**. The plan shows three sound lessons, four
 sentences each, an overall practice count, and the next sentence.
 
 1. Press **Start lesson plan**. This saves the sequence and opens its first sentence.
-2. Use **Go to recording**, record up to five seconds and press **Check and save my
-   recording**. After analysis finishes, the result offers Continue to the next
+2. Use **Go to recording**, record up to five seconds and watch the input-level
+   meter. Listen to the local playback, then press **Confirm and analyze**. Use
+   **Record again** or **Discard recording** if needed. After analysis finishes, the result offers Continue to the next
    sentence. Failed processing leaves the same step available for retry.
 3. Expand **See the ordered sentences** to show all three lessons and their fixed
    order, including Next / Upcoming / Practiced labels.
@@ -103,11 +104,11 @@ occupied, use the existing app or deliberately choose `-Port 7864`.
 1. Sign up/sign in. Open **My profile**, change your display name, select TH/IH/AE,
    show Save and Discard, and reload to show that saved preferences persist.
 2. Open **Practice**. Show the 12 preset lessons, the written hints and the example
-   audio. Record a short sentence such as **I think so**, then check and save it.
+   audio. Record a short sentence such as **I think so**, then review the playback and choose **Confirm and analyze**.
    Results include recognized words, experimental sound feedback, original audio,
    processing details and the analysis download.
 3. Select **My own sentence** or **Free speech**, record/upload up to five seconds,
-   and save it. Review the recognized words, edit if needed, then **Confirm
+   then review and choose **Confirm recording and transcribe**. Review the recognized words, edit if needed, then **Confirm
    transcript**. Confirmation is required before either operation below.
 4. Press **Analyze confirmed words**. Wait for analysis to finish. TH, IH and AE
    are supported contrasts. An unsupported sentence or uncertain evidence can

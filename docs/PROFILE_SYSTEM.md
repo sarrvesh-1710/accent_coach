@@ -13,7 +13,7 @@ Language only orders first exercises; it is never supplied as a scoring input.
 
 ## 2. Save what actually happened
 
-Each recording belongs to its signed-in account. Preset lessons use their selected
+Recording previews stay in the browser until explicitly confirmed. Confirmed recordings belong to the signed-in account. Discarded previews never contribute to the profile or lesson progress. Preset lessons use their selected
 sentence; custom/free speech requires the learner to review and confirm the words.
 The existing speech pipeline records experimental TH/IH/AE observations as
 practice suggested, expected sound favored, or inconclusive. Original audio,

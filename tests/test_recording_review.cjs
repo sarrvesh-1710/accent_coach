@@ -1,0 +1,103 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const vm=require('node:vm');
+const fs=require('node:fs');
+const path=require('node:path');
+
+async function page(options={}){
+  const h={nodes:{},requests:[],revoked:[],sequence:0};
+  class Node{
+    constructor(id=''){
+      this.id=id;this.value='';this.hidden=false;this.disabled=false;this.textContent='';this.listeners={};this.children=[];this.dataset={};
+    }
+    set id(value){this._id=value;if(value)h.nodes[value]=this;}
+    get id(){return this._id;}
+    addEventListener(event,handler){this.listeners[event]=handler;}
+    fire(event,detail={}){return this.listeners[event]?.({target:this,preventDefault(){},...detail});}
+    append(...nodes){this.children.push(...nodes);}
+    replaceChildren(...nodes){this.children=nodes;}
+    removeAttribute(key){this[key]='';}
+    setAttribute(key,value){this[key]=value;}
+    querySelectorAll(){return [];}
+    pause(){} load(){} focus(){this.focused=true;}
+  }
+  for(const id of ['lesson','input-mode','custom-text','recording-file','record','stop','mic-meter','mic-level','mic-feedback','mic-time','recording-review','preview','analyze','record-again','discard-recording','practice-status','attempt-result','session-panel','lesson-hint','example','custom-label','suggestions'])new Node(id);
+  h.nodes.lesson.value='think';h.nodes['input-mode'].value='preset';h.nodes['custom-text'].value='I think so';
+  const document={hidden:false,getElementById:id=>h.nodes[id] || null,
+    querySelector:()=>({content:'test-csrf'}),querySelectorAll:()=>[h.nodes.preview,h.nodes.example],createElement:()=>new Node(),addEventListener(){}};
+  class Mic{
+    constructor(callbacks){this.callbacks=callbacks;h.microphone=this;}
+    start(){this.callbacks.onState('requesting');}
+    stop(){this.callbacks.onState('idle');return Promise.resolve();}
+    dispose(){}
+  }
+  const location={search:'',pathname:'/practice',assign:value=>{h.destination=value;}};
+  function response(spec){return {ok:spec.ok!==false,status:spec.status || 200,json:async()=>spec.data};}
+  const fetch=async(url,request={})=>{
+    const method=request.method || 'GET';h.requests.push({url,method,...request});
+    if(method==='POST'){
+      if(options.post)return response(await options.post(url,request));
+      if(url==='/api/sessions')return response({data:{attempt_id:'session1',input_revision:1}});
+      if(url.includes('/recording?'))return response({data:{attempt_id:'session1'}});
+      return response({data:{attempt_id:'attempt1'}});
+    }
+    if(url==='/api/lessons')return response({data:[{id:'think',text:'I think so',hint:'TH'}]});
+    if(url==='/api/lesson-plan')return response({data:{next:null}});
+    if(url==='/api/profile/progress')return response({data:{recommendations:[]}});
+    if(url==='/api/attempts/attempt1')return response({data:{id:'attempt1',prompt_id:'think',sentence:'I think so',status:'completed',message:'Saved',result:null}});
+    if(url==='/api/sessions/session1')return response({data:{attempt_id:'session1',input_revision:2,recognized_text:'I think so',confirmed_text:null,transcription_status:'completed',analysis_status:null,generation_status:null,sound_results:[],limitations:[],errors:{},timings:{}}});
+    throw Error('Unexpected request: '+url);
+  };
+  const sandbox={document,location,fetch,Blob,URLSearchParams,
+    URL:{createObjectURL:()=>`blob:draft-${++h.sequence}`,revokeObjectURL:url=>h.revoked.push(url)},
+    window:{AccentMicrophoneRecorder:Mic,addEventListener(){},confirm:()=>true},
+    clearTimeout(){},setTimeout:()=>1,console};
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../web_assets/accounts.js'),'utf8'),sandbox);
+  await new Promise(setImmediate);
+  h.posts=()=>h.requests.filter(r=>r.method==='POST');
+  h.upload=async()=>{h.nodes['recording-file'].files=[new Blob(['wav-fixture'],{type:'audio/wav'})];await h.nodes['recording-file'].fire('change');};
+  return h;
+}
+
+test('preview and discard never upload or create an attempt',async()=>{
+  const h=await page();await h.upload();
+  assert.equal(h.nodes['recording-review'].hidden,false);assert.equal(h.nodes.analyze.disabled,false);
+  assert.match(h.nodes.preview.src,/^blob:/);assert.equal(h.posts().length,0);
+  const url=h.nodes.preview.src;await h.nodes['discard-recording'].fire('click');
+  assert.equal(h.nodes['recording-review'].hidden,true);assert.equal(h.nodes.analyze.disabled,true);
+  assert.equal(h.posts().length,0);assert.ok(h.revoked.includes(url));assert.equal(h.nodes.record.focused,true);
+});
+test('confirmation locks the draft and a double click only uploads once',async()=>{
+  let acknowledge;const waiting=new Promise(resolve=>{acknowledge=resolve;});
+  const h=await page({post:()=>waiting});await h.upload();
+  const submitted=h.nodes.analyze.fire('click');await Promise.resolve();
+  assert.equal(h.posts().length,1);assert.equal(h.nodes.lesson.disabled,true);assert.equal(h.nodes['recording-file'].disabled,true);
+  await h.nodes.analyze.fire('click');assert.equal(h.posts().length,1);
+  acknowledge({data:{attempt_id:'attempt1'}});await submitted;
+  assert.equal(h.nodes['recording-review'].hidden,true);assert.equal(h.nodes.analyze.disabled,true);assert.equal(h.nodes.record.disabled,false);
+  assert.equal(h.posts()[0].url,'/api/attempts?prompt_id=think');
+});
+test('failed confirmation preserves the local recording for retry',async()=>{
+  const h=await page({post:async()=>({ok:false,status:503,data:{detail:'Please retry.'}})});await h.upload();
+  const url=h.nodes.preview.src;await h.nodes.analyze.fire('click');
+  assert.equal(h.nodes['recording-review'].hidden,false);assert.equal(h.nodes.preview.src,url);
+  assert.equal(h.nodes.analyze.disabled,false);assert.match(h.nodes['practice-status'].textContent,/retry/);
+});
+test('a denied re-record keeps the previous draft available',async()=>{
+  const h=await page();await h.upload();const url=h.nodes.preview.src;
+  await h.nodes['record-again'].fire('click');assert.equal(h.nodes['recording-review'].hidden,true);
+  h.microphone.callbacks.onState('idle');h.microphone.callbacks.onError('Microphone permission was not granted.');
+  assert.equal(h.nodes['recording-review'].hidden,false);assert.equal(h.nodes.preview.src,url);
+  assert.equal(h.nodes.analyze.disabled,false);assert.equal(h.posts().length,0);
+  assert.match(h.nodes['practice-status'].textContent,/previous recording/);
+});
+test('mode changes discard the old draft and confirmed custom recordings still require word confirmation',async()=>{
+  const h=await page();await h.upload();
+  h.nodes['input-mode'].value='custom_text';await h.nodes['input-mode'].fire('change');
+  assert.equal(h.nodes['recording-review'].hidden,true);assert.equal(h.nodes.analyze.disabled,true);assert.equal(h.posts().length,0);
+  await h.upload();assert.equal(h.nodes.analyze.textContent,'Confirm recording and transcribe');
+  await h.nodes.analyze.fire('click');
+  assert.deepEqual(h.posts().map(p=>p.url),['/api/sessions','/api/sessions/session1/recording?expected_revision=1']);
+  assert.equal(h.nodes['session-check'].disabled,true);assert.equal(h.nodes['session-generate'].disabled,true);
+  assert.equal(h.nodes['recording-review'].hidden,true);
+});

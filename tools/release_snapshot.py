@@ -17,7 +17,7 @@ def main():
              *[p for p in (ROOT / 'voice_generation/panel').rglob('*') if p.is_file()],
              *ROOT.glob('*.py'), *ROOT.glob('*.json'), *ROOT.glob('requirements*.txt'),
              *(ROOT / 'phoneme_scoring').glob('*.py'), ROOT / 'phoneme_scoring/settings.json',
-             ROOT / 'phoneme_scoring/phoneme_map.json', *(ROOT / 'tests').glob('*.py'), *(ROOT / 'tools').glob('*.py'),
+             ROOT / 'phoneme_scoring/phoneme_map.json', *(ROOT / 'tests').glob('*.py'), *(ROOT / 'tests').glob('*.cjs'), *(ROOT / 'tools').glob('*.py'),
              *[p for p in (ROOT / 'web_assets').rglob('*') if p.is_file()]]
     settings = load_settings(ROOT / 'phoneme_scoring/settings.json')
     report = dict(git_head=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),

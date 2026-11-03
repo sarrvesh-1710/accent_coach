@@ -1,5 +1,7 @@
 # Structured lesson plan
 
+**Recording review:** a live sound-level meter appears while recording. Listen locally, then choose Record again, Discard recording, or Confirm and analyze. Audio is uploaded only after confirmation. See [recording controls](docs/RECORDING_REVIEW.md).
+
 My profile and Practice now include a saved, ordered plan: three sound lessons with four sentences each. Start a plan, record the current sentence, review its analysis, then continue to the next sentence. See [the lesson-plan guide](docs/LESSON_PLAN.md).
 
 # Profile system and server handoff

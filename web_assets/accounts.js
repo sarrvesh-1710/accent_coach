@@ -102,88 +102,95 @@ async function suggestions() {
 }
 if ($('history-list')) history().then(()=>{const id=new URLSearchParams(location.search).get('attempt');if(id)return showAttempt(id);}).catch(error => {$('history-status').textContent = error.message;});
 if ($('lesson')) {
-  let wav = null, previewUrl = null, recorder = null, stream = null, stopTimer = null, lessons = [];
-  function acceptRecording(blob) {
-    wav = blob;
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    previewUrl = URL.createObjectURL(blob);
-    $('preview').src = previewUrl; $('preview').hidden = false;
-    $('analyze').disabled = false;
-    $('practice-status').textContent = 'Recording ready. Listen, then check and save it.';
+  let wav=null,previewUrl=null,lessons=[],captureState='idle',submitting=false,alive=true,lessonsReady=false;
+  function renderRecording(){
+    const busy=captureState!=='idle',locked=busy || submitting || !lessonsReady;
+    $('record').disabled=locked;
+    for(const id of ['lesson','input-mode','custom-text','recording-file'])$(id).disabled=locked;
+    $('stop').disabled=!['requesting','recording'].includes(captureState);
+    $('stop').textContent=captureState==='requesting' ? 'Cancel microphone request' : 'Stop recording';
+    $('mic-meter').hidden=captureState!=='recording';
+    $('recording-review').hidden=!wav || busy;
+    $('record-again').disabled=locked;$('discard-recording').disabled=locked;
+    $('analyze').disabled=!wav || locked;
+    $('analyze').textContent=$('input-mode').value==='preset' ? 'Confirm and analyze' : 'Confirm recording and transcribe';
   }
-  function stopMicrophone() {
-    if (recorder?.state === 'recording') recorder.stop();
-    clearTimeout(stopTimer);
-    stream?.getTracks().forEach(track => track.stop());
-    $('stop').disabled = true;
+  function clearDraft(){
+    wav=null;
+    $('preview').pause();$('preview').removeAttribute('src');$('preview').load();
+    if(previewUrl)URL.revokeObjectURL(previewUrl);previewUrl=null;
+    $('recording-file').value='';renderRecording();
   }
-  $('recording-file').addEventListener('change', event => {
-    const file = event.target.files[0];
-    if (!file) return;
-    if (file.size > 10 * 1024 * 1024) { $('practice-status').textContent = 'Use a WAV file under 10 MB.'; return; }
+  function acceptRecording(blob){
+    if(!alive)return;
+    clearDraft();wav=blob;previewUrl=URL.createObjectURL(blob);$('preview').src=previewUrl;
+    $('practice-status').textContent='Recording ready for review. Listen, then confirm, record again, or discard. Nothing has been saved yet.';
+    renderRecording();
+  }
+  const microphone=new window.AccentMicrophoneRecorder({
+    onState:state=>{
+      if(!alive)return;captureState=state;renderRecording();
+      if(state==='requesting')$('practice-status').textContent='Waiting for microphone access. Allow the browser request or cancel.';
+      if(state==='recording')$('practice-status').textContent='Recording. Speak into your microphone; recording stops after five seconds.';
+      if(state==='preparing')$('practice-status').textContent='Preparing playback for your review. Nothing has been uploaded.';
+    },
+    onLevel:signal=>{
+      if(!alive)return;
+      $('mic-level').value=signal.level;
+      $('mic-meter').dataset.state=signal.status;
+      const messages={listening:'Listening for sound...',sound:'Sound detected. Your microphone is picking up audio.',quiet:'No sound detected yet. Check your microphone or speak closer.',loud:'Input is very loud. Move a little farther from the microphone.'};
+      if($('mic-feedback').textContent!==messages[signal.status])$('mic-feedback').textContent=messages[signal.status];
+      $('mic-time').textContent=signal.seconds.toFixed(1)+' / 5 seconds';
+    },
+    onRecording:acceptRecording,
+    onError:message=>{if(alive)$('practice-status').textContent=message+(wav ? ' Your previous recording is still available for review.' : '');}
+  });
+  function beginRecording(){
+    if(submitting || captureState!=='idle' || !lessonsReady)return;
+    document.querySelectorAll('audio').forEach(audio=>audio.pause());
+    $('recording-file').value='';microphone.start();
+  }
+  $('record').addEventListener('click',beginRecording);
+  $('record-again').addEventListener('click',beginRecording);
+  $('stop').addEventListener('click',()=>{
+    const requesting=captureState==='requesting';microphone.stop();
+    if(requesting)$('practice-status').textContent='Microphone request canceled. Nothing new was saved.';
+  });
+  $('discard-recording').addEventListener('click',()=>{
+    if(submitting || captureState!=='idle')return;
+    clearDraft();$('practice-status').textContent='Recording discarded. Nothing was saved. Record again when ready.';$('record').focus();
+  });
+  $('recording-file').addEventListener('change',event=>{
+    if(submitting || captureState!=='idle')return;
+    const file=event.target.files[0];if(!file)return;
+    if(file.size>10*1024*1024){clearDraft();$('practice-status').textContent='Use a WAV file under 10 MB and at most five seconds.';return;}
     acceptRecording(file);
   });
-  $('record').addEventListener('click', async () => {
-    try {
-      $('record').disabled = true; $('analyze').disabled = true;
-      $('lesson').disabled = true; $('recording-file').disabled = true; $('recording-file').value = '';
-      stream = await navigator.mediaDevices.getUserMedia({audio: true});
-      const chunks = [];
-      recorder = new MediaRecorder(stream);
-      recorder.addEventListener('dataavailable', e => { if (e.data.size) chunks.push(e.data); });
-      recorder.addEventListener('stop', async () => {
-        try {
-          const context = new AudioContext();
-          try {
-            const decoded = await context.decodeAudioData(await new Blob(chunks).arrayBuffer());
-            // Encode mono PCM WAV locally. Cap recorder startup/stop padding at 5 seconds.
-            const frames = Math.min(decoded.length, Math.floor(decoded.sampleRate * 5));
-            const buffer = new ArrayBuffer(44 + frames * 2), view = new DataView(buffer);
-            const str = (offset, text) => [...text].forEach((c, i) => view.setUint8(offset + i, c.charCodeAt(0)));
-            str(0, 'RIFF'); view.setUint32(4, 36 + frames * 2, true); str(8, 'WAVE'); str(12, 'fmt ');
-            view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
-            view.setUint32(24, decoded.sampleRate, true); view.setUint32(28, decoded.sampleRate * 2, true);
-            view.setUint16(32, 2, true); view.setUint16(34, 16, true); str(36, 'data'); view.setUint32(40, frames * 2, true);
-            const channels = Array.from({length: decoded.numberOfChannels}, (_, c) => decoded.getChannelData(c));
-            for (let i = 0; i < frames; i++) {
-              const sample = Math.max(-1, Math.min(1, channels.reduce((sum, c) => sum + c[i], 0) / channels.length));
-              view.setInt16(44 + i * 2, sample < 0 ? sample * 32768 : sample * 32767, true);
-            }
-            acceptRecording(new Blob([buffer], {type: 'audio/wav'}));
-          } finally { await context.close(); }
-        } catch (error) { $('practice-status').textContent = 'Could not read microphone audio. Try uploading a WAV file.'; }
-        finally { $('record').disabled = false; $('lesson').disabled = false; $('recording-file').disabled = false; }
-      });
-      recorder.start(); $('stop').disabled = false;
-      $('practice-status').textContent = 'Recording… Say the sentence. Recording stops after five seconds.';
-      stopTimer = setTimeout(stopMicrophone, 4900);
-    } catch (error) {
-      stopMicrophone(); $('record').disabled = false; $('lesson').disabled = false; $('recording-file').disabled = false;
-      $('practice-status').textContent = 'Microphone access was unavailable. Allow microphone access or upload a WAV file.';
-    }
-  });
-  $('stop').addEventListener('click', stopMicrophone);
+  renderRecording();
   $('analyze').addEventListener('click', async () => {
-    if (!wav) return;
-    $('analyze').disabled = true;
+    if(!wav || submitting || captureState!=='idle')return;
+    const confirmedWav=wav,confirmedMode=$('input-mode').value,confirmedLesson=$('lesson').value,confirmedText=$('custom-text').value;
+    submitting=true;renderRecording();
     $('practice-status').textContent = 'Saving your recording…';
     clearTimeout(pollTimer); shownAttempt = null;
     $('attempt-result').hidden = true; $('attempt-result').replaceChildren();
     try {
-      if ($('input-mode').value !== 'preset') {
-        const state = await api('/api/sessions', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({input_mode:$('input-mode').value,target_accent:'en-US-general-american'})});
-        const attached = await api(`/api/sessions/${state.attempt_id}/recording?expected_revision=${state.input_revision}`,{method:'POST',headers:{'Content-Type':'audio/wav'},body:wav});
-        sessionDraft = $('input-mode').value === 'custom_text' ? $('custom-text').value : null;
+      if (confirmedMode !== 'preset') {
+        const state = await api('/api/sessions', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({input_mode:confirmedMode,target_accent:'en-US-general-american'})});
+        const attached = await api(`/api/sessions/${state.attempt_id}/recording?expected_revision=${state.input_revision}`,{method:'POST',headers:{'Content-Type':'audio/wav'},body:confirmedWav});
+        sessionDraft = confirmedMode === 'custom_text' ? confirmedText : null;
         sessionDirty = Boolean(sessionDraft);
-        $('practice-status').textContent = 'Recording saved. Review and confirm the transcript below.';
+        clearDraft();
+        $('practice-status').textContent = 'Recording confirmed and saved. Review and confirm the transcript below.';
         await showSession(attached.attempt_id);
         return;
       }
-      const result = await api('/api/attempts?prompt_id=' + encodeURIComponent($('lesson').value), {method: 'POST', headers: {'Content-Type': 'audio/wav'}, body: wav});
-      $('practice-status').textContent = 'Recording saved to your account. You can follow analysis here or in My history.';
+      const result = await api('/api/attempts?prompt_id=' + encodeURIComponent(confirmedLesson), {method: 'POST', headers: {'Content-Type': 'audio/wav'}, body: confirmedWav});
+      clearDraft();
+      $('practice-status').textContent = 'Recording confirmed and saved to your account. You can follow analysis here or in My history.';
       await showAttempt(result.attempt_id);
     } catch (error) { $('practice-status').textContent = error.message; }
-    finally { $('analyze').disabled = false; }
+    finally {submitting=false;renderRecording();}
   });
   function selectLesson() {
     const lesson = lessons.find(p => p.id === $('lesson').value);
@@ -191,15 +198,16 @@ if ($('lesson')) {
     $('example').src = '/site-assets/examples/' + encodeURIComponent($('lesson').value) + '.wav';
   }
   $('lesson').addEventListener('change', () => {
-    wav = null; $('preview').hidden = true; $('preview').removeAttribute('src'); $('preview').load(); $('recording-file').value = ''; $('analyze').disabled = true;
-    if (previewUrl) { URL.revokeObjectURL(previewUrl); previewUrl = null; }
+    clearDraft();
     selectLesson(); if(typeof refreshLessonPlan==='function')refreshLessonPlan(); $('practice-status').textContent = 'Record the new sentence before checking.';
   });
   $('input-mode').addEventListener('change', () => {
+    clearDraft();
     const preset = $('input-mode').value === 'preset';
     $('lesson').hidden = !preset; $('example').hidden = !preset; $('lesson-hint').hidden = !preset;
     $('custom-label').hidden = $('input-mode').value !== 'custom_text';
-    $('analyze').textContent = preset ? 'Check and save my recording' : 'Save and transcribe my recording';
+    renderRecording();
+    $('practice-status').textContent='Record for this practice mode, then review and confirm the recording.';
     clearTimeout(sessionTimer); sessionId = null;
     $('session-panel').hidden = true;
     if(typeof refreshLessonPlan==='function')refreshLessonPlan();
@@ -208,15 +216,16 @@ if ($('lesson')) {
     lessons=data;
     const requested=new URLSearchParams(location.search).get('lesson');
     if(lessons.some(p=>p.id===requested))$('lesson').value=requested;
-    else if(!wav && recorder?.state!=='recording'){
+    else if(!wav && captureState==='idle'){
       const plan=await api('/api/lesson-plan');
       if(plan.next && lessons.some(p=>p.id===plan.next.lesson_id))$('lesson').value=plan.next.lesson_id;
     }
     selectLesson();
     if(typeof refreshLessonPlan==='function')refreshLessonPlan();
-  }).catch(error=>{$('practice-status').textContent=error.message;});
+  }).catch(error=>{$('practice-status').textContent=error.message;}).finally(()=>{lessonsReady=true;renderRecording();});
   suggestions().catch(() => {});
-  window.addEventListener('pagehide', () => {stopMicrophone(); if (previewUrl) URL.revokeObjectURL(previewUrl);});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden && ['requesting','recording'].includes(captureState))microphone.stop();});
+  window.addEventListener('pagehide',()=>{alive=false;microphone.dispose();if(previewUrl)URL.revokeObjectURL(previewUrl);});
 }
 
 let sessionId = null, sessionTimer = null, sessionState = null, sessionDraft = null, sessionDirty = false;

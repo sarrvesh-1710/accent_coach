@@ -53,7 +53,7 @@ class AccountIntegrationTests(unittest.TestCase):
         response = client.post('/signup', data={'csrf': client.cookies['accent_login_csrf'], 'username': name,
                             'password': 'test-password-123', 'display_name': name.title()})
         self.assertEqual(response.status_code, 200, response.text)
-        self.assertIn('Practice English pronunciation.', response.text)
+        self.assertIn('id="practice-heading"', response.text)
         csrf = re.search(r'<meta name="csrf-token" content="([^"]+)"', response.text).group(1)
         return {'X-CSRF-Token': csrf}
 

@@ -11,7 +11,7 @@ profile and find **My lesson plan**. The plan shows three sound lessons, four
 sentences each, an overall practice count, and the next sentence.
 
 1. Press **Start lesson plan**. This saves the sequence and opens its first sentence.
-2. Use **Go to recording**, record up to five seconds and watch the input-level
+2. Use **Practice this sentence**, record up to five seconds and watch the input-level
    meter. Listen to the local playback, then press **Confirm and analyze**. Use
    **Record again** or **Discard recording** if needed. After analysis finishes, the result offers Continue to the next
    sentence. Failed processing leaves the same step available for retry.

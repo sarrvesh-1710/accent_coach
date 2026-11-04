@@ -108,6 +108,9 @@ if ($('lesson')) {
     $('record').disabled=locked;
     for(const id of ['lesson','input-mode','custom-text','recording-file'])$(id).disabled=locked;
     $('stop').disabled=!['requesting','recording'].includes(captureState);
+    $('stop').hidden=$('stop').disabled;
+    $('record').hidden=Boolean(wav) && !busy;
+    if($('practice-sentence'))$('practice-sentence').textContent=$('input-mode').value==='preset' ? (lessons.find(p=>p.id===$('lesson').value)?.text || 'Loading your sentence…') : $('input-mode').value==='custom_text' ? ($('custom-text').value.trim() || 'Enter your sentence in the options below.') : 'Say a short sentence in your own words.';
     $('stop').textContent=captureState==='requesting' ? 'Cancel microphone request' : 'Stop recording';
     $('mic-meter').hidden=captureState!=='recording';
     $('recording-review').hidden=!wav || busy;
@@ -126,6 +129,8 @@ if ($('lesson')) {
     clearDraft();wav=blob;previewUrl=URL.createObjectURL(blob);$('preview').src=previewUrl;
     $('practice-status').textContent='Recording ready for review. Listen, then confirm, record again, or discard. Nothing has been saved yet.';
     renderRecording();
+    $('recording-review').scrollIntoView?.({behavior:'smooth',block:'nearest'});
+    $('analyze').focus();
   }
   const microphone=new window.AccentMicrophoneRecorder({
     onState:state=>{
@@ -166,6 +171,7 @@ if ($('lesson')) {
     if(file.size>10*1024*1024){clearDraft();$('practice-status').textContent='Use a WAV file under 10 MB and at most five seconds.';return;}
     acceptRecording(file);
   });
+  $('custom-text').addEventListener('input',renderRecording);
   renderRecording();
   $('analyze').addEventListener('click', async () => {
     if(!wav || submitting || captureState!=='idle')return;
@@ -195,6 +201,7 @@ if ($('lesson')) {
   function selectLesson() {
     const lesson = lessons.find(p => p.id === $('lesson').value);
     $('lesson-hint').textContent = lesson?.hint || '';
+    renderRecording();
     $('example').src = '/site-assets/examples/' + encodeURIComponent($('lesson').value) + '.wav';
   }
   $('lesson').addEventListener('change', () => {
@@ -206,6 +213,8 @@ if ($('lesson')) {
     const preset = $('input-mode').value === 'preset';
     $('lesson').hidden = !preset; $('example').hidden = !preset; $('lesson-hint').hidden = !preset;
     $('custom-label').hidden = $('input-mode').value !== 'custom_text';
+    for(const id of ['lesson-label','example-caption'])if($(id))$(id).hidden=!preset;
+    if($('practice-heading'))$('practice-heading').textContent=preset ? '1. Listen to the sentence' : '1. Choose what to say';
     renderRecording();
     $('practice-status').textContent='Record for this practice mode, then review and confirm the recording.';
     clearTimeout(sessionTimer); sessionId = null;

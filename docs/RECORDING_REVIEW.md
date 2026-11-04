@@ -60,3 +60,7 @@ zero saved attempts before, during and after review/discard. The test draft was
 removed. Physical microphone capture was not opened by the agent; the presenter
 should grant permission and try speaking on the actual device before a demo.
 Node is required only for the client tests, not for the deployed Python app.
+
+## Practice page guidance
+
+The page follows Listen, Record, then Review and confirm. The selected sentence is displayed prominently. Sentence and mode selection, WAV upload, and full plan options are expandable so the main path stays clear. Stop appears only during capture or a microphone request; a local draft replaces the initial Record action with review actions. Incoming recordings scroll to the review area and focus confirmation, without submitting it.

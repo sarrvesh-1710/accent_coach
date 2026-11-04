@@ -43,12 +43,20 @@ def start_plan(store,owner,prompts,*,restart=False):
         db.execute('DELETE FROM lesson_plan_steps WHERE user_id=?',(owner,))
 
 
-def record_completion(db,owner,identity,result):
-    """Called inside the immutable attempt publication transaction, never by UI."""
-    if not isinstance(result,dict) or result.get('overall_status') not in ('complete','partial','completed'):return
+def completed_analysis(result):
+    """Practice completion includes uncertain sound evidence, never failed processing."""
+    if not isinstance(result,dict) or result.get('overall_status') not in ('complete','partial','completed'):return False
     stages=result.get('stage_statuses') or {}
     for name in ('learner_dsp','alignment','phoneme_scoring'):
-        if name in stages and stages[name].get('status') not in ('ok','available','warning','partial'):return
+        usable={'ok','available','warning','partial'}
+        if name=='phoneme_scoring':usable.add('uncertain')
+        if name in stages and stages[name].get('status') not in usable:return False
+    return True
+
+
+def record_completion(db,owner,identity,result):
+    """Called inside the immutable attempt publication transaction, never by UI."""
+    if not completed_analysis(result):return
     row=db.execute('SELECT body FROM lesson_plans WHERE user_id=?',(owner,)).fetchone()
     if not row:return
     plan=json.loads(row['body'])
@@ -67,6 +75,15 @@ def get_plan(store,owner,prompts):
             completed={r['prompt_id'] for r in db.execute('''SELECT DISTINCT p.prompt_id FROM lesson_plan_steps p
                 JOIN attempts a ON a.id=p.attempt_id AND a.user_id=p.user_id
                 WHERE p.user_id=? AND p.plan_id=? AND a.deleted=0 AND a.status='completed' ''',(owner,plan['plan_id']))}
+            # Reconcile previously finished uncertain analyses that older versions omitted.
+            # Derive credit without rewriting recordings or counting pre-plan history.
+            candidates=db.execute("SELECT prompt_id,sentence,result FROM attempts WHERE user_id=? AND deleted=0 AND status='completed' AND created>=?",(owner,plan['started_at'])).fetchall()
+            planned={(s['lesson_id'],s['sentence']) for s in plan['steps']}
+            for attempt in candidates:
+                if (attempt['prompt_id'],attempt['sentence']) not in planned:continue
+                try:result=json.loads(attempt['result'] or 'null')
+                except (ValueError,TypeError):continue
+                if completed_analysis(result):completed.add(attempt['prompt_id'])
     if not plan:plan=preview_plan(store,owner,prompts)
     catalog={p['id']:p for p in prompts}
     steps=[];groups={}

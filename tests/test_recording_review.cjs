@@ -5,7 +5,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 
 async function page(options={}){
-  const h={nodes:{},requests:[],revoked:[],sequence:0};
+  const h={nodes:{},requests:[],revoked:[],sequence:0,timers:[]};
   class Node{
     constructor(id=''){
       this.id=id;this.value='';this.hidden=false;this.disabled=false;this.textContent='';this.listeners={};this.children=[];this.dataset={};
@@ -41,6 +41,7 @@ async function page(options={}){
       if(url.includes('/recording?'))return response({data:{attempt_id:'session1'}});
       return response({data:{attempt_id:'attempt1'}});
     }
+    if(options.get){const data=options.get(url);if(data!==undefined)return response({data});}
     if(url==='/api/lessons')return response({data:[{id:'think',text:'I think so',hint:'TH'}]});
     if(url==='/api/lesson-plan')return response({data:{next:null}});
     if(url==='/api/profile/progress')return response({data:{recommendations:[]}});
@@ -51,7 +52,8 @@ async function page(options={}){
   const sandbox={document,location,fetch,Blob,URLSearchParams,
     URL:{createObjectURL:()=>`blob:draft-${++h.sequence}`,revokeObjectURL:url=>h.revoked.push(url)},
     window:{AccentMicrophoneRecorder:Mic,addEventListener(){},confirm:()=>true},
-    clearTimeout(){},setTimeout:()=>1,console};
+    clearTimeout(){},setTimeout:callback=>{h.timers.push(callback);return h.timers.length;},console,
+    ...(options.plan ? {refreshLessonPlan:async()=>options.plan} : {})};
   vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../web_assets/accounts.js'),'utf8'),sandbox);
   await new Promise(setImmediate);
   h.posts=()=>h.requests.filter(r=>r.method==='POST');
@@ -100,4 +102,26 @@ test('mode changes discard the old draft and confirmed custom recordings still r
   assert.deepEqual(h.posts().map(p=>p.url),['/api/sessions','/api/sessions/session1/recording?expected_revision=1']);
   assert.equal(h.nodes['session-check'].disabled,true);assert.equal(h.nodes['session-generate'].disabled,true);
   assert.equal(h.nodes['recording-review'].hidden,true);
+});
+
+function allText(node){return [node.textContent,...node.children.map(allText)].join(' ');}
+test('analysis automatically reveals inline feedback, current progress and the next sentence',async()=>{
+  let ready=false;
+  const h=await page({plan:{started:true,practiced:1,total:12,next:{lesson_id:'think_can',sentence:'I think I can'},steps:[{lesson_id:'think',practiced:true}]},get:url=>url==='/api/attempts/attempt1' ? {id:'attempt1',prompt_id:'think',sentence:'I think so',status:ready?'completed':'processing',result:ready?{target_assessment:{targets:[{word:'think',expected_phone:'TH',status:'insufficient_evidence',reason:'Recording may be distorted; record again.'}]}}:null}:undefined});
+  await h.upload();await h.nodes.analyze.fire('click');
+  assert.match(allText(h.nodes['attempt-result']),/Results will appear here automatically/);
+  assert.equal(h.nodes['attempt-result'].focused,true);
+  ready=true;h.nodes['attempt-result'].focused=false;await h.timers.shift()();
+  const text=allText(h.nodes['attempt-result']);
+  assert.match(text,/Your results/);assert.match(text,/1\/12 sentences complete/);
+  assert.match(text,/recording may be distorted/);assert.match(text,/marked as practiced/);
+  assert.match(text,/Next sentence: I think I can/);assert.match(text,/again \(optional\)/);
+  assert.equal(h.nodes['attempt-result'].focused,true);
+});
+test('failed analysis shows zero progress and explains why a retry is needed',async()=>{
+  const h=await page({plan:{started:true,practiced:0,total:12,next:{lesson_id:'think',sentence:'I think so'},steps:[]},get:url=>url==='/api/attempts/attempt1'?{id:'attempt1',prompt_id:'think',sentence:'I think so',status:'failed',message:'Alignment unavailable',result:null}:undefined});
+  await h.upload();await h.nodes.analyze.fire('click');
+  const text=allText(h.nodes['attempt-result']);
+  assert.match(text,/0\/12 sentences complete/);assert.match(text,/Analysis could not finish/);
+  assert.match(text,/Try this sentence again/);assert.doesNotMatch(text,/marked as practiced/);
 });

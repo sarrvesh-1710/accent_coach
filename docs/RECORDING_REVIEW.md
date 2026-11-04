@@ -64,3 +64,7 @@ Node is required only for the client tests, not for the deployed Python app.
 ## Practice page guidance
 
 The page follows Listen, Record, then Review and confirm. The selected sentence is displayed prominently. Sentence and mode selection, WAV upload, and full plan options are expandable so the main path stays clear. Stop appears only during capture or a microphone request; a local draft replaces the initial Record action with review actions. Incoming recordings scroll to the review area and focus confirmation, without submitting it.
+
+## Inline analysis results
+
+Confirming a preset recording immediately opens its processing panel. It refreshes automatically and brings completed feedback into view, including the target sound, assessment reason, practice tip, current completed/total sentence count, and Next sentence action. Completed uncertain sound feedback counts as practice, not mastery. Failed processing does not advance the plan. Existing in-plan uncertain analyses omitted by older progress rules are counted on the next plan read; pre-plan history remains excluded. Saved attempts can also be opened at `/practice?attempt=ATTEMPT_ID`.

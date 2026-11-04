@@ -18,13 +18,20 @@ let shownAttempt = null;
 let pollTimer = null;
 async function showAttempt(id) {
   clearTimeout(pollTimer);
+  const previousAttempt=shownAttempt;
   shownAttempt = id;
   const attempt = await api('/api/attempts/' + encodeURIComponent(id));
-  if (!attempt.prompt_id) { await showSession(id); return; }
   if (shownAttempt !== id) return;
+  if (!attempt.prompt_id) { await showSession(id); return; }
   const panel = $('attempt-result');
+  const pending=['queued','processing'].includes(attempt.status);
+  const phase=pending ? 'processing' : 'finished';
+  const reveal=previousAttempt!==id || panel.dataset.phase!==phase;
+  panel.dataset.phase=phase;
   panel.hidden = false;
-  panel.replaceChildren(element('h2', attempt.sentence), element('p', attempt.message));
+  panel.replaceChildren(element('h2',pending ? 'Analyzing your recording…' : 'Your results'),element('h3',attempt.sentence),element('p',pending ? 'Your recording is saved. Results will appear here automatically when analysis finishes. You can stay on this page.' : attempt.message));
+  if($('practice-status'))$('practice-status').textContent=pending ? 'Analyzing… Your results will appear directly below.' : attempt.status==='failed' ? 'Analysis could not finish. Details and next steps are shown below.' : 'Analysis finished. Your feedback and lesson progress are shown below.';
+  const courseProgress=element('div');panel.append(courseProgress);
   const audio = element('audio');
   audio.controls = true;
   audio.src = '/api/attempts/' + encodeURIComponent(id) + '/audio';
@@ -34,12 +41,17 @@ async function showAttempt(id) {
     panel.append(element('p', 'Recognized words: ' + (result.spoken_words_verification?.transcript || 'Unavailable')));
     const targets = result.target_assessment?.targets || [];
     const labels = {
-      expected_supported: 'The model favors the expected sound.',
+      expected_supported: 'The model favors the expected sound. Keep practicing it in the next sentence.',
       alternative_favored: 'Possible substitution: try practicing this sound.',
-      insufficient_evidence: 'Inconclusive: there is not enough evidence to judge this sound.'
+      insufficient_evidence: 'We couldn’t confidently judge this sound. This does not establish a pronunciation mistake.'
     };
     for (const target of targets) {
-      panel.append(element('p', `${target.word} /${target.expected_phone}/  /  ${labels[target.status] || 'Inconclusive.'}`));
+      const feedback=element('div',undefined,'sound-feedback');
+      feedback.append(element('h3',target.word+' /'+target.expected_phone+'/'),element('p',labels[target.status] || 'Sound feedback is inconclusive.'));
+      if(target.reason)feedback.append(element('p',target.reason==='Recording may be distorted; record again.' ? 'The recording may be distorted. For clearer feedback, you can optionally try again with the microphone a little farther away.' : target.reason));
+      const tips={TH:'For TH in think, place your tongue tip lightly between your teeth and let air flow gently.',IH:'For IH in ship, use a short, relaxed vowel; compare ship with sheep.',AE:'For AE in bad, open your jaw; compare bad with bed.'};
+      if(target.status!=='expected_supported' && tips[target.expected_phone])feedback.append(element('p',tips[target.expected_phone]));
+      panel.append(feedback);
     }
     if (!targets.length) panel.append(element('p', 'Sound feedback is unavailable for this attempt.'));
     panel.append(element('p', 'Experimental feedback, not a pronunciation grade.'));
@@ -66,17 +78,33 @@ async function showAttempt(id) {
   panel.append(remove);
   if (['queued', 'processing'].includes(attempt.status)) {
     pollTimer = setTimeout(() => showAttempt(id).catch(error => {
-      panel.append(element('p', error.message, 'form-error'));
+      panel.append(element('p', 'Could not refresh results. Your recording is saved. '+error.message, 'form-error'));
+      const retry=element('button','Reload results');retry.addEventListener('click',()=>showAttempt(id));panel.append(retry);
     }), 1500);
   } else if ($('suggestions')) {
     if(typeof refreshLessonPlan==='function'){
       const plan=await refreshLessonPlan();
-      if(plan?.started && plan.next){
-        const next=element('a',(plan.next.lesson_id===attempt.prompt_id ? 'Retry this sentence: ' : 'Continue to sentence '+plan.next.number+': ')+plan.next.sentence,'button primary');
-        next.href='/practice?lesson='+encodeURIComponent(plan.next.lesson_id)+'&plan=1';panel.append(next);
-      }else if(plan?.complete)panel.append(element('p','All sentences in your lesson plan have been practiced.'));
+      if(shownAttempt!==id)return;
+      if(plan?.started){
+        courseProgress.append(element('p',`${plan.practiced}/${plan.total} sentences complete`,'result-progress'));
+        const credited=plan.steps?.some(step=>step.lesson_id===attempt.prompt_id && step.practiced);
+        panel.append(element('p',credited ? 'This sentence is marked as practiced. Uncertain feedback does not mean you failed; you can continue or retry voluntarily.' : 'This recording did not advance your plan. '+(attempt.status==='failed' || attempt.result?.overall_status==='failed' ? 'Analysis could not finish. Try recording again.' : 'It may be outside this plan, recorded before the plan started, or have unavailable analysis.')));
+        if(plan.next){
+          const same=plan.next.lesson_id===attempt.prompt_id;
+          const next=element('a',(same ? 'Try this sentence again: ' : 'Next sentence: ')+plan.next.sentence,'button primary');
+          next.href='/practice?lesson='+encodeURIComponent(plan.next.lesson_id)+'&plan=1';courseProgress.append(next);
+        }else if(plan.complete)panel.append(element('p','You completed all sentences in your lesson plan.'));
+        if(credited){const retry=element('a','Practice this sentence again (optional)');retry.href='/practice?lesson='+encodeURIComponent(attempt.prompt_id)+'#record';panel.append(retry);}
+      }else if(plan){
+        panel.append(element('p',`0/${plan.total} sentences complete in a lesson plan. This was free practice; start a plan to track an ordered sequence.`));
+        const link=element('a','Start a lesson plan');link.href='#lesson-plan-heading';panel.append(link);
+      }
     }
-    await suggestions();
+    await suggestions().catch(()=>{});
+  }
+  if(shownAttempt===id && reveal){
+    panel.setAttribute('tabindex','-1');panel.focus();
+    panel.scrollIntoView?.({behavior:'smooth',block:'start'});
   }
 }
 async function history() {
@@ -95,9 +123,10 @@ async function history() {
 async function suggestions() {
   const {recommendations:plan} = await api('/api/profile/progress');
   const panel=$('suggestions');panel.replaceChildren();
+  if($('lesson'))panel.append(element('p','These are optional reviews. Follow Next sentence in your results to continue your lesson plan.'));
   for(const next of (plan || []).slice(0,2)){
     panel.append(element('p',next.phone+' as in '+next.word+': '+next.reason));
-    if(next.lesson_id){const link=element('a','Practice: '+next.sentence);link.href='/practice?lesson='+encodeURIComponent(next.lesson_id);panel.append(link);}
+    if(next.lesson_id){const link=element('a','Optional review: '+next.sentence);link.href='/practice?lesson='+encodeURIComponent(next.lesson_id);panel.append(link);}
   }
 }
 if ($('history-list')) history().then(()=>{const id=new URLSearchParams(location.search).get('attempt');if(id)return showAttempt(id);}).catch(error => {$('history-status').textContent = error.message;});
@@ -232,6 +261,8 @@ if ($('lesson')) {
     selectLesson();
     if(typeof refreshLessonPlan==='function')refreshLessonPlan();
   }).catch(error=>{$('practice-status').textContent=error.message;}).finally(()=>{lessonsReady=true;renderRecording();});
+  const savedAttempt=new URLSearchParams(location.search).get('attempt');
+  if(savedAttempt)showAttempt(savedAttempt).catch(error=>{$('practice-status').textContent=error.message;});
   suggestions().catch(() => {});
   document.addEventListener('visibilitychange',()=>{if(document.hidden && ['requesting','recording'].includes(captureState))microphone.stop();});
   window.addEventListener('pagehide',()=>{alive=false;microphone.dispose();if(previewUrl)URL.revokeObjectURL(previewUrl);});

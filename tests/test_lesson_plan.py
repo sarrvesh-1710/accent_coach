@@ -47,6 +47,20 @@ class LessonPlanTests(unittest.TestCase):
         self.finish('ship');self.assertEqual(self.plan()['practiced'],1)
         self.finish('ship_big');self.assertEqual(self.plan()['practiced'],2)
         self.assertEqual(self.plan()['next']['lesson_id'],'ship_see')
+    def test_uncertain_scoring_counts_and_repairs_previously_omitted_credit(self):
+        start_plan(self.store,self.owner,PROMPTS)
+        prompt=next(p for p in PROMPTS if p['id']=='ship')
+        identity=self.store.create_attempt(self.owner,prompt,b'fixture')
+        result=dict(overall_status='partial',stage_statuses=dict(learner_dsp=dict(status='warning'),alignment=dict(status='available'),phoneme_scoring=dict(status='uncertain')),
+            target_assessment=dict(targets=[dict(word='ship',expected_phone='IH',status='insufficient_evidence',reason='Recording may be distorted; record again.')]))
+        self.store.finish(self.owner,identity,result=result)
+        self.assertEqual(self.plan()['practiced'],1)
+        with self.store.connect() as db:db.execute('DELETE FROM lesson_plan_steps WHERE user_id=?',(self.owner,))
+        self.assertEqual(self.plan()['practiced'],1)
+        self.assertEqual(self.plan()['next']['lesson_id'],'ship_see')
+        self.store.delete_attempt(self.owner,identity)
+        self.assertEqual(self.plan()['practiced'],0)
+
     def test_failed_missing_analysis_and_other_accounts_do_not_advance(self):
         start_plan(self.store,self.owner,PROMPTS)
         self.finish('ship',error='Failed');self.finish('ship',unavailable=True)

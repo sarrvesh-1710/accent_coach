@@ -156,9 +156,10 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
                 raise HTTPException(413, 'This upload is too large.')
         return bytes(data)
 
-    async def json_body(request):
+    async def json_body(request, *, allow_empty=False):
         try:
-            value = json.loads(await read_body(request, 8192))
+            raw=await read_body(request,8192)
+            value=json.loads(raw) if raw or not allow_empty else {}
         except (ValueError, UnicodeError):
             raise HTTPException(422, 'Invalid request.') from None
         if not isinstance(value, dict):
@@ -344,8 +345,29 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
     async def begin_plan(request:Request):
         from accounts.lesson_plan import start_plan,get_plan
         user=require(request);csrf(request,request.headers.get('x-csrf-token'),user['csrf'])
-        try:start_plan(store,user['id'],prompts)
+        options=await json_body(request,allow_empty=True)
+        skip=options.get('skip_starting_check',False)
+        if type(skip) is not bool:raise HTTPException(422,'Choose whether to skip the starting check.')
+        try:start_plan(store,user['id'],prompts,assessment=not skip)
         except ValueError as exc:raise HTTPException(422,str(exc)) from None
+        return get_plan(store,user['id'],prompts)
+
+    @site.post('/api/lesson-plan/build')
+    async def build_plan(request:Request):
+        from accounts.lesson_plan import build_personalized_plan
+        user=require(request);csrf(request,request.headers.get('x-csrf-token'),user['csrf'])
+        try:return build_personalized_plan(store,user['id'],prompts)
+        except ValueError as exc:raise HTTPException(422,str(exc)) from None
+
+    @site.post('/api/lesson-plan/skip')
+    async def skip_check(request:Request):
+        from accounts.lesson_plan import get_plan,start_plan
+        user=require(request);csrf(request,request.headers.get('x-csrf-token'),user['csrf'])
+        plan=get_plan(store,user['id'],prompts)
+        if plan['kind']=='assessment':
+            try:
+                start_plan(store,user['id'],prompts,restart=plan['started'],assessment=False,expected_plan_id=plan['plan_id'])
+            except ValueError as exc:raise HTTPException(422,str(exc)) from None
         return get_plan(store,user['id'],prompts)
 
     @site.post('/api/lesson-plan/restart')
@@ -353,7 +375,7 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
         from accounts.lesson_plan import start_plan,get_plan
         user=require(request);csrf(request,request.headers.get('x-csrf-token'),user['csrf'])
         if (await json_body(request)).get('restart') is not True:raise HTTPException(422,'Confirm starting a new plan.')
-        try:start_plan(store,user['id'],prompts,restart=True)
+        try:start_plan(store,user['id'],prompts,restart=True,assessment=False)
         except ValueError as exc:raise HTTPException(422,str(exc)) from None
         return get_plan(store,user['id'],prompts)
 

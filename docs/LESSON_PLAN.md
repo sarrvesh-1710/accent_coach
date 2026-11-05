@@ -1,6 +1,8 @@
 # Structured lesson plan
 
-The current catalog becomes three sound lessons with four sentences each. Sound
+New learners first complete a three-sentence starting check, one per sound; see [the starting-check guide](STARTING_CHECK.md). Building a plan afterward orders the remaining nine sentences and keeps the three starting recordings in History. Skipping the check uses the full twelve-sentence catalog. Existing plans retain their sequence.
+
+The full catalog contains three sound lessons with four sentences each. Sound
 lesson order is chosen once when starting, using the user's current sound
 recommendations and goals; a new learner can use the optional language starter.
 The saved sequence stays fixed through the course. The user can still practice
@@ -14,8 +16,7 @@ IH: The ship is here; I see a ship; This ship is big; A ship is coming.
 
 AE: That is a bad bed; It is a bad day; This is a bad plan; That was a bad idea.
 
-The plan displays Lesson 1 of 3 and Sentence 1 of 4, plus an overall 0 of 12
-practice counter. The initial sound order can differ by language/goals/feedback.
+The starting check displays a 0/3 counter. A personalized follow-up plan displays 0/9; a full course displays 0/12. Lesson and sentence counters reflect the saved sequence. The initial sound order can differ by language/goals/feedback.
 The within-sound sequence above is preset for consistency; these sentences are
 not a validated difficulty scale.
 

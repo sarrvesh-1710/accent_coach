@@ -12,6 +12,8 @@ sys.path.insert(0,str(ROOT))
 
 def seed(store):
     password='demo-practice-403!'
+    if not store.login('demo_assessment',password):
+        store.register('demo_assessment',password,'Starting Check Demo')
     if not store.login('demo_starter',password):
         store.register('demo_starter',password,'Starter Learner',background=dict(language='japanese',use_starters=True))
     owner=store.login('demo_learner',password)
@@ -49,6 +51,7 @@ def main():
     os.environ['ACCENT_COACH_OPEN_BROWSER']='0' if args.no_browser else '1'
     print('Sample workspace only. Username: demo_learner  Password: demo-practice-403!',flush=True)
     print('Use demo_starter with the same password for editable language-based starter lessons.',flush=True)
+    print('Use demo_assessment with the same password for the three-sentence starting check.',flush=True)
     print('Use demo_new with the same password to show the empty starting profile.',flush=True)
     from site_server import serve
     serve()

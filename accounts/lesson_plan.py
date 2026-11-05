@@ -4,6 +4,7 @@ import time
 import uuid
 
 from accounts.coaching import profile_progress,SOUNDS
+from accounts.background import starter_plan
 
 SENTENCES={
  'TH':['think','think_can','think_again','think_fine'],
@@ -12,7 +13,7 @@ SENTENCES={
 }
 
 
-def preview_plan(store,owner,prompts):
+def practice_plan(store,owner,prompts):
     feedback=profile_progress(store,owner,prompts)
     steps=[];seen=set()
     for recommendation in feedback['recommendations']:
@@ -31,12 +32,28 @@ def preview_plan(store,owner,prompts):
         based_on='Your personal sound feedback and goals' if not feedback['starter']['active'] else feedback['starter']['label']+' and selected goals')
 
 
-def start_plan(store,owner,prompts,*,restart=False):
-    draft=preview_plan(store,owner,prompts)
+def preview_plan(store,owner,prompts,*,assessment=True):
+    if not assessment:return practice_plan(store,owner,prompts)
+    order=starter_plan(store.background(owner))['order']
+    catalog={p['id']:p for p in prompts}
+    steps=[]
+    for phone in order:
+        prompt=catalog.get(SENTENCES[phone][0])
+        if prompt:
+            steps.append(dict(lesson_id=prompt['id'],sentence=prompt['text'],phone=phone,tip=prompt.get('practice_tip',SOUNDS[phone]['tip'])))
+    return dict(version=2,kind='assessment',plan_id=None,started_at=None,steps=steps,
+        based_on='Three starting sounds: TH, IH and AE. Your language preference only sets their order.')
+
+
+def start_plan(store,owner,prompts,*,restart=False,assessment=True,expected_plan_id=None,omit_lessons=()):
+    draft=preview_plan(store,owner,prompts,assessment=assessment)
+    draft.setdefault("kind","practice")
+    if omit_lessons:draft["steps"]=[s for s in draft["steps"] if s["lesson_id"] not in omit_lessons]
     if not draft['steps']:raise ValueError('No practice sentences are configured yet.')
     with store.connect() as db:
         db.execute('BEGIN IMMEDIATE')
         previous=db.execute('SELECT body FROM lesson_plans WHERE user_id=?',(owner,)).fetchone()
+        if expected_plan_id and (not previous or json.loads(previous['body'])['plan_id']!=expected_plan_id):return
         if previous and not restart:return
         draft.update(plan_id=uuid.uuid4().hex,started_at=time.time())
         db.execute('INSERT INTO lesson_plans VALUES (?,?) ON CONFLICT(user_id) DO UPDATE SET body=excluded.body',(owner,json.dumps(draft)))
@@ -103,7 +120,15 @@ def get_plan(store,owner,prompts):
         for sound in profile_progress(store,owner,prompts)['recommendations']:
             if sound['latest'] in ('practice','inconclusive') and sound['lesson_id']:
                 review.append(dict(phone=sound['phone'],sentence=sound['sentence'],lesson_id=sound['lesson_id'],reason=sound['reason']))
-    return dict(plan_id=plan['plan_id'],started=bool(plan['plan_id']),started_at=plan['started_at'],based_on=plan['based_on'],
+    return dict(kind=plan.get('kind','practice'),plan_id=plan['plan_id'],started=bool(plan['plan_id']),started_at=plan['started_at'],based_on=plan['based_on'],
         total=len(usable),lessons_total=len(groups),practiced=sum(s['practiced'] for s in usable),next=next_step,steps=steps,
         complete=bool(plan['plan_id'] and usable and not next_step),review=review,catalog_changed=len(usable)!=len(steps),
-        explanation='Follow the sentences in order. A saved recording with completed analysis marks a sentence as practiced, even when feedback is inconclusive. This is practice progress, not a grade. Failed processing does not advance the plan.')
+        explanation=('Record one sentence for each sound. Read feedback after each recording, then build your personalized lesson plan. Uncertain feedback means we need more evidence, not that you made a mistake.' if plan.get('kind')=='assessment' else 'Follow the sentences in order. A saved recording with completed analysis marks a sentence as practiced, even when feedback is inconclusive. This is practice progress, not a grade. Failed processing does not advance the plan.'))
+
+
+def build_personalized_plan(store,owner,prompts):
+    plan=get_plan(store,owner,prompts)
+    if plan['kind']!='assessment':return plan
+    if not plan['complete']:raise ValueError('Finish the three starting sentences, or skip the starting check to begin regular practice.')
+    start_plan(store,owner,prompts,restart=True,assessment=False,expected_plan_id=plan['plan_id'],omit_lessons=[s['lesson_id'] for s in plan['steps']])
+    return get_plan(store,owner,prompts)

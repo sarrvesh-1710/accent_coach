@@ -86,13 +86,16 @@ async function showAttempt(id) {
       const plan=await refreshLessonPlan();
       if(shownAttempt!==id)return;
       if(plan?.started){
-        courseProgress.append(element('p',`${plan.practiced}/${plan.total} sentences complete`,'result-progress'));
+        courseProgress.append(element('p',`${plan.practiced}/${plan.total} ${plan.kind==='assessment' ? 'starting sentences complete' : 'sentences complete'}`,'result-progress'));
         const credited=plan.steps?.some(step=>step.lesson_id===attempt.prompt_id && step.practiced);
-        panel.append(element('p',credited ? 'This sentence is marked as practiced. Uncertain feedback does not mean you failed; you can continue or retry voluntarily.' : 'This recording did not advance your plan. '+(attempt.status==='failed' || attempt.result?.overall_status==='failed' ? 'Analysis could not finish. Try recording again.' : 'It may be outside this plan, recorded before the plan started, or have unavailable analysis.')));
+        panel.append(element('p',credited ? 'This sentence is marked as practiced. Uncertain feedback means we need more evidence; you can continue or retry voluntarily.' : 'This recording did not advance your plan. '+(attempt.status==='failed' || attempt.result?.overall_status==='failed' ? 'Analysis could not finish. Try recording again.' : 'It may be outside this plan, recorded before the plan started, or have unavailable analysis.')));
         if(plan.next){
           const same=plan.next.lesson_id===attempt.prompt_id;
           const next=element('a',(same ? 'Try this sentence again: ' : 'Next sentence: ')+plan.next.sentence,'button primary');
           next.href='/practice?lesson='+encodeURIComponent(plan.next.lesson_id)+'&plan=1';courseProgress.append(next);
+        }else if(plan.complete && plan.kind==='assessment'){
+          courseProgress.append(element('p','Starting check complete. Your feedback can now guide your lessons.'));
+          const build=element('button','Build my lesson plan','primary');build.addEventListener('click',()=>buildPersonalPlan(build,panel));courseProgress.append(build);
         }else if(plan.complete)panel.append(element('p','You completed all sentences in your lesson plan.'));
         if(credited){const retry=element('a','Practice this sentence again (optional)');retry.href='/practice?lesson='+encodeURIComponent(attempt.prompt_id)+'#record';panel.append(retry);}
       }else if(plan){
@@ -220,6 +223,8 @@ if ($('lesson')) {
         await showSession(attached.attempt_id);
         return;
       }
+      const currentPlan=await api('/api/lesson-plan');
+      if(currentPlan.kind==='assessment' && !currentPlan.started)await api('/api/lesson-plan/start',{method:'POST'});
       const result = await api('/api/attempts?prompt_id=' + encodeURIComponent(confirmedLesson), {method: 'POST', headers: {'Content-Type': 'audio/wav'}, body: confirmedWav});
       clearDraft();
       $('practice-status').textContent = 'Recording confirmed and saved to your account. You can follow analysis here or in My history.';

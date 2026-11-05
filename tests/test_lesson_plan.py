@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from fastapi.testclient import TestClient
 from accounts.store import Store
-from accounts.lesson_plan import get_plan,start_plan
+from accounts.lesson_plan import get_plan,start_plan,preview_plan,build_personalized_plan
 from site_server import create_site
 
 PROMPTS=json.loads((Path(__file__).resolve().parents[1]/'prompts.json').read_text(encoding='utf-8'))
@@ -26,29 +26,28 @@ class LessonPlanTests(unittest.TestCase):
         self.store.finish(owner,identity,result=result,error=error)
         return identity
     def test_preview_has_language_order_twelve_unique_steps_and_no_saved_plan(self):
-        plan=self.plan();self.assertFalse(plan['started']);self.assertEqual(plan['total'],12)
-        self.assertEqual(plan['next']['lesson_id'],'ship')
+        plan=preview_plan(self.store,self.owner,PROMPTS,assessment=False);self.assertIsNone(plan['plan_id']);self.assertEqual(len(plan['steps']),12)
+        self.assertEqual(plan['steps'][0]['lesson_id'],'ship')
         self.assertEqual(len({s['lesson_id'] for s in plan['steps']}),12)
         self.assertEqual([s['lesson_id'] for s in plan['steps'][:4]],['ship','ship_see','ship_big','ship_coming'])
-        self.assertEqual({s['lesson_number'] for s in plan['steps']},{1,2,3})
         with self.store.connect() as db:self.assertEqual(db.execute('SELECT COUNT(*) FROM lesson_plans').fetchone()[0],0)
     def test_start_is_idempotent_and_sequence_survives_preferences_and_restart(self):
-        start_plan(self.store,self.owner,PROMPTS);initial=self.plan()
+        start_plan(self.store,self.owner,PROMPTS,assessment=False);initial=self.plan()
         self.store.profile(self.owner,'Alice',['TH'],background=dict(language='japanese',use_starters=True))
-        start_plan(self.store,self.owner,PROMPTS)
+        start_plan(self.store,self.owner,PROMPTS,assessment=False)
         self.assertEqual(initial['plan_id'],self.plan()['plan_id'])
         self.assertEqual(initial['steps'],self.plan()['steps'])
         reopened=Store(self.temp.name)
         self.assertEqual(get_plan(reopened,self.owner,PROMPTS)['steps'],initial['steps'])
     def test_completed_inconclusive_attempt_advances_and_repeated_attempts_count_once(self):
-        start_plan(self.store,self.owner,PROMPTS)
+        start_plan(self.store,self.owner,PROMPTS,assessment=False)
         self.finish('ship')
         self.assertEqual(self.plan()['practiced'],1);self.assertEqual(self.plan()['next']['lesson_id'],'ship_see')
         self.finish('ship');self.assertEqual(self.plan()['practiced'],1)
         self.finish('ship_big');self.assertEqual(self.plan()['practiced'],2)
         self.assertEqual(self.plan()['next']['lesson_id'],'ship_see')
     def test_uncertain_scoring_counts_and_repairs_previously_omitted_credit(self):
-        start_plan(self.store,self.owner,PROMPTS)
+        start_plan(self.store,self.owner,PROMPTS,assessment=False)
         prompt=next(p for p in PROMPTS if p['id']=='ship')
         identity=self.store.create_attempt(self.owner,prompt,b'fixture')
         result=dict(overall_status='partial',stage_statuses=dict(learner_dsp=dict(status='warning'),alignment=dict(status='available'),phoneme_scoring=dict(status='uncertain')),
@@ -62,7 +61,7 @@ class LessonPlanTests(unittest.TestCase):
         self.assertEqual(self.plan()['practiced'],0)
 
     def test_failed_missing_analysis_and_other_accounts_do_not_advance(self):
-        start_plan(self.store,self.owner,PROMPTS)
+        start_plan(self.store,self.owner,PROMPTS,assessment=False)
         self.finish('ship',error='Failed');self.finish('ship',unavailable=True)
         self.finish('ship',owner=self.other)
         self.assertEqual(self.plan()['practiced'],0)
@@ -70,22 +69,22 @@ class LessonPlanTests(unittest.TestCase):
     def test_old_and_inflight_attempts_do_not_fill_a_new_plan(self):
         self.finish('ship')
         pending=self.store.create_attempt(self.owner,PROMPTS[0],b'fixture')
-        start_plan(self.store,self.owner,PROMPTS)
+        start_plan(self.store,self.owner,PROMPTS,assessment=False)
         self.store.finish(self.owner,pending,dict(overall_status='complete'))
         self.assertEqual(self.plan()['practiced'],0)
     def test_deletion_removes_credit_but_another_retained_attempt_keeps_it(self):
-        start_plan(self.store,self.owner,PROMPTS)
+        start_plan(self.store,self.owner,PROMPTS,assessment=False)
         first=self.finish('ship');second=self.finish('ship')
         self.store.delete_attempt(self.owner,second);self.assertEqual(self.plan()['practiced'],1)
         self.store.delete_attempt(self.owner,first);self.assertEqual(self.plan()['practiced'],0)
     def test_restart_applies_new_preferences_without_deleting_history(self):
-        start_plan(self.store,self.owner,PROMPTS);old=self.plan()['plan_id'];self.finish('ship')
+        start_plan(self.store,self.owner,PROMPTS,assessment=False);old=self.plan()['plan_id'];self.finish('ship')
         self.store.profile(self.owner,'Alice',['TH'],background=dict(language='japanese',use_starters=True))
-        start_plan(self.store,self.owner,PROMPTS,restart=True)
+        start_plan(self.store,self.owner,PROMPTS,restart=True,assessment=False)
         self.assertNotEqual(self.plan()['plan_id'],old);self.assertEqual(self.plan()['practiced'],0)
         self.assertEqual(len(self.store.history(self.owner)),1)
     def test_finished_plan_retains_sequence_and_offers_review(self):
-        start_plan(self.store,self.owner,PROMPTS);steps=self.plan()['steps']
+        start_plan(self.store,self.owner,PROMPTS,assessment=False);steps=self.plan()['steps']
         for step in steps:self.finish(step['lesson_id'])
         plan=self.plan();self.assertTrue(plan['complete']);self.assertIsNone(plan['next'])
         self.assertEqual(plan['practiced'],12);self.assertEqual(len(plan['review']),3)
@@ -102,7 +101,7 @@ class LessonPlanTests(unittest.TestCase):
             client.cookies.set('accent_session',self.store.new_session(self.owner))
             page=client.get('/practice');token=re.search('name="csrf-token" content="([^"]+)"',page.text).group(1)
             headers={'X-CSRF-Token':token}
-            plan=client.post('/api/lesson-plan/start',headers=headers).json()
+            plan=client.post('/api/lesson-plan/start',headers=headers,json={'skip_starting_check':True}).json()
             self.assertEqual(plan['next']['lesson_id'],'ship')
             response=client.post('/api/attempts?prompt_id=ship',content=output.getvalue(),headers={**headers,'Content-Type':'audio/wav'})
             self.assertEqual(response.status_code,202)
@@ -115,6 +114,48 @@ class LessonPlanTests(unittest.TestCase):
             plan=client.get('/api/lesson-plan').json()
             self.assertEqual(plan['practiced'],1);self.assertEqual(plan['next']['lesson_id'],'ship_see')
             self.assertEqual(plan['next']['lesson_step'],2)
+
+    def test_starting_check_three_sounds_language_order_and_stable_snapshot(self):
+        preview=self.plan()
+        self.assertEqual(preview['kind'],'assessment');self.assertEqual(preview['total'],3)
+        self.assertEqual([s['phone'] for s in preview['steps']],['IH','AE','TH'])
+        start_plan(self.store,self.owner,PROMPTS)
+        original=self.plan()
+        self.store.profile(self.owner,'Alice',[],background=dict(language='hindi',use_starters=True))
+        start_plan(self.store,self.owner,PROMPTS)
+        self.assertEqual(original['steps'],self.plan()['steps'])
+        self.finish('ship',unavailable=True);self.assertEqual(self.plan()['practiced'],0)
+        self.finish('ship');self.assertEqual(self.plan()['practiced'],1)
+        with self.assertRaises(ValueError):build_personalized_plan(self.store,self.owner,PROMPTS)
+        self.finish('bad_bed',outcome='expected_supported');self.finish('think',outcome='alternative_favored')
+        self.assertTrue(self.plan()['complete'])
+        plan=build_personalized_plan(self.store,self.owner,PROMPTS)
+        self.assertEqual(plan['kind'],'practice');self.assertEqual(plan['total'],9)
+        self.assertEqual(plan['next']['phone'],'TH');self.assertEqual(plan['practiced'],0)
+        self.assertFalse({'think','ship','bad_bed'} & {s['lesson_id'] for s in plan['steps']})
+        self.assertEqual(build_personalized_plan(self.store,self.owner,PROMPTS)['plan_id'],plan['plan_id'])
+        self.assertEqual(len(self.store.history(self.owner)),4)
+
+    def test_http_starting_check_skip_build_auth_and_owner_isolation(self):
+        app=create_site(data_root=self.temp.name,prompts=PROMPTS,analyzer=lambda *a,**k:None)
+        with TestClient(app,base_url='http://localhost') as client:
+            self.assertEqual(client.post('/api/lesson-plan/build').status_code,401)
+            client.cookies.set('accent_session',self.store.new_session(self.owner))
+            page=client.get('/practice');token=re.search('name="csrf-token" content="([^"]+)"',page.text).group(1)
+            headers={'X-CSRF-Token':token}
+            self.assertEqual(client.post('/api/lesson-plan/skip').status_code,403)
+            self.assertEqual(client.post('/api/lesson-plan/build',headers=headers).status_code,422)
+            check=client.post('/api/lesson-plan/start',headers=headers).json()
+            self.assertEqual(check['total'],3)
+            self.finish('ship');self.finish('bad_bed');self.finish('think')
+            plan=client.post('/api/lesson-plan/build',headers=headers).json()
+            self.assertEqual(plan['total'],9)
+            self.assertEqual(client.post('/api/lesson-plan/build',headers=headers).json()['plan_id'],plan['plan_id'])
+            self.assertFalse(self.plan(self.other)['started'])
+            client.cookies.set('accent_session',self.store.new_session(self.other))
+            page=client.get('/practice');headers={'X-CSRF-Token':re.search('name="csrf-token" content="([^"]+)"',page.text).group(1)}
+            skipped=client.post('/api/lesson-plan/skip',headers=headers).json()
+            self.assertEqual(skipped['kind'],'practice');self.assertEqual(skipped['total'],12)
 
     def test_http_owner_csrf_restart_confirmation_and_no_browser_mark_complete(self):
         app=create_site(data_root=self.temp.name,prompts=PROMPTS,analyzer=lambda *a,**k:None)

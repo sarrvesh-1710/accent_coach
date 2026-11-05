@@ -51,6 +51,7 @@ async function page(options={}){
   };
   const sandbox={document,location,fetch,Blob,URLSearchParams,
     URL:{createObjectURL:()=>`blob:draft-${++h.sequence}`,revokeObjectURL:url=>h.revoked.push(url)},
+    buildPersonalPlan:async()=>{h.built=true;},
     window:{AccentMicrophoneRecorder:Mic,addEventListener(){},confirm:()=>true},
     clearTimeout(){},setTimeout:callback=>{h.timers.push(callback);return h.timers.length;},console,
     ...(options.plan ? {refreshLessonPlan:async()=>options.plan} : {})};
@@ -72,7 +73,7 @@ test('preview and discard never upload or create an attempt',async()=>{
 test('confirmation locks the draft and a double click only uploads once',async()=>{
   let acknowledge;const waiting=new Promise(resolve=>{acknowledge=resolve;});
   const h=await page({post:()=>waiting});await h.upload();
-  const submitted=h.nodes.analyze.fire('click');await Promise.resolve();
+  const submitted=h.nodes.analyze.fire('click');await new Promise(setImmediate);
   assert.equal(h.posts().length,1);assert.equal(h.nodes.lesson.disabled,true);assert.equal(h.nodes['recording-file'].disabled,true);
   await h.nodes.analyze.fire('click');assert.equal(h.posts().length,1);
   acknowledge({data:{attempt_id:'attempt1'}});await submitted;
@@ -124,4 +125,19 @@ test('failed analysis shows zero progress and explains why a retry is needed',as
   const text=allText(h.nodes['attempt-result']);
   assert.match(text,/0\/12 sentences complete/);assert.match(text,/Analysis could not finish/);
   assert.match(text,/Try this sentence again/);assert.doesNotMatch(text,/marked as practiced/);
+});
+
+test('first preset confirmation starts the three-sentence check before creating an attempt',async()=>{
+  const h=await page({get:url=>url==='/api/lesson-plan'?{kind:'assessment',started:false,total:3,next:null}:undefined,post:async url=>({data:url==='/api/lesson-plan/start'?{kind:'assessment',started:true}:{attempt_id:'attempt1'}})});
+  await h.upload();await h.nodes.analyze.fire('click');
+  assert.deepEqual(h.posts().map(p=>p.url),['/api/lesson-plan/start','/api/attempts?prompt_id=think']);
+});
+test('third starting result offers building a plan instead of another required recording',async()=>{
+  const h=await page({plan:{kind:'assessment',started:true,practiced:3,total:3,complete:true,next:null,steps:[{lesson_id:'think',practiced:true}]}});
+  await h.upload();await h.nodes.analyze.fire('click');
+  const text=allText(h.nodes['attempt-result']);
+  assert.match(text,/3\/3 starting sentences complete/);assert.match(text,/Build my lesson plan/);
+  assert.doesNotMatch(text,/Try this sentence again:/);
+  function find(node){return node.textContent==='Build my lesson plan'?node:node.children.map(find).find(Boolean);}
+  await find(h.nodes['attempt-result']).fire('click');assert.equal(h.built,true);
 });

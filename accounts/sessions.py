@@ -110,7 +110,7 @@ class SessionMethods:
             state[kind+'_status']=None
         errors={} if audio else {k:v for k,v in state['errors'].items() if k=='transcription'}
         timings={} if audio else {k:v for k,v in state['timings'].items() if k=='transcription'}
-        state.update(sound_results=[],generated_audio_id=None,generated_audio_type=None,errors=errors,timings=timings,limitations=[])
+        state.update(recording_quality=None,content_status=None,sound_results=[],generated_audio_id=None,generated_audio_type=None,errors=errors,timings=timings,limitations=[])
         if audio:
             state.update(recognized_text=None,confirmed_text=None,transcription_status=None,_transcription=None)
 
@@ -179,7 +179,7 @@ class SessionMethods:
             if kind=='generation':
                 state.update(generated_audio_id=None,generated_audio_type=None)
                 db.execute("DELETE FROM practice_assets WHERE attempt_id=? AND role='synthetic_example'",(identity,))
-            if kind=='analysis': state['sound_results']=[]
+            if kind=='analysis':state.update(sound_results=[],recording_quality=None,content_status=None)
             self._save_practice(db,state)
             return dict(ok=True,attempt_id=identity,input_revision=revision,job_id=job,status='queued')
 
@@ -219,6 +219,9 @@ class SessionMethods:
                 or state['confirmed_text']!=snapshot['confirmed_text']): return False
             successful=result.get('ok',result.get('status')=='completed')
             job['status']='completed' if successful else 'failed';state[kind+'_status']=job['status']
+            if kind=='analysis':
+                state['recording_quality']=result.get('recording_quality')
+                state['content_status']=result.get('content_status')
             if not successful:
                 state['errors'][kind]=result.get('error') or dict(code='MODEL_UNAVAILABLE',user_message='Processing failed. Please retry.',retryable=True)
             elif kind=='transcription':

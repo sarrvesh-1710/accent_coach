@@ -11,7 +11,7 @@ async function refreshLessonPlan(){
     const heading=document.getElementById('lesson-plan-heading');if(heading)heading.textContent=starting ? 'Your three-sentence starting check' : 'My lesson plan';
     const selected=document.getElementById('lesson')?.value;
     const mode=document.getElementById('input-mode')?.value;
-    const key=JSON.stringify([plan,selected,mode]);
+    const key=JSON.stringify([plan,selected,mode,document.getElementById('attempt-result')?.hidden]);
     if(panel.dataset.renderKey===key)return plan;
     const wasExpanded=panel.querySelector('details')?.open || false;
     panel.dataset.renderKey=key;panel.replaceChildren();
@@ -20,14 +20,16 @@ async function refreshLessonPlan(){
     if(!plan.total){panel.append(element('p','No practice sentences are available. Ask the app owner to check the lesson catalog.'));return plan;}
     const progress=element('progress');progress.max=plan.total;progress.value=plan.practiced;progress.setAttribute('aria-label','Sentences practiced');
     panel.append(element('p',`${plan.practiced}/${plan.total} ${starting ? 'starting sentences complete' : 'sentences practiced'}`,'plan-progress-label'),progress);
-    if(starting || !practicePage)panel.append(element('p',plan.explanation));
+    if(!practicePage)panel.append(element('p',plan.explanation));
     if(plan.catalog_changed)panel.append(element('p','Some planned sentences have changed. Start a new plan to use the current lesson catalog.'));
     if(plan.next){
       const next=element('div',undefined,'plan-next');
-      next.append(element('p',starting ? `Starting sentence ${plan.next.number} of ${plan.total}` : `Lesson ${plan.next.lesson_number} of ${plan.lessons_total} | Sentence ${plan.next.lesson_step} of ${plan.next.lesson_total}`),element('h3',plan.next.sentence),element('p',plan.next.tip));
+      const displayed=practicePage && mode==='preset' ? plan.steps.find(step=>step.lesson_id===selected) || plan.next : plan.next;
+      next.append(element('p',starting ? `Starting sentence ${displayed.number} of ${plan.total}` : `Lesson ${displayed.lesson_number} of ${plan.lessons_total} | Sentence ${displayed.lesson_step} of ${displayed.lesson_total}`));
+      if(!practicePage)next.append(element('h3',plan.next.sentence),element('p',plan.next.tip));
       if(plan.started){
         const here=location.pathname==='/practice' && selected===plan.next.lesson_id && mode==='preset';
-        const link=element('a',here ? 'Practice this sentence' : starting ? 'Continue starting check' : 'Continue lesson plan','button primary');link.href=here ? '#practice-heading' : '/practice?lesson='+encodeURIComponent(plan.next.lesson_id)+'&plan=1';next.append(link);
+        const link=element('a',here ? 'Practice this sentence' : starting ? 'Continue starting check' : 'Continue lesson plan','button primary');link.href=here ? '#practice-heading' : '/practice?lesson='+encodeURIComponent(plan.next.lesson_id)+'&plan=1';if(!practicePage)next.append(link);
       }else{
         const start=element('button',starting ? 'Start my three sentences' : 'Start lesson plan','primary');start.type='button';
         start.addEventListener('click',async()=>{
@@ -40,7 +42,7 @@ async function refreshLessonPlan(){
       panel.append(next);
     }else if(plan.complete && starting){
       panel.append(element('h3','Starting check complete'),element('p','Your three sound checks are saved. Build a lesson plan using your personal feedback; uncertain sounds remain needs more evidence.'));
-      const build=element('button','Build my lesson plan','primary');build.addEventListener('click',()=>buildPersonalPlan(build,panel));panel.append(build);
+      const build=element('button','Build my lesson plan','primary');build.addEventListener('click',()=>buildPersonalPlan(build,panel));if(!practicePage || document.getElementById('attempt-result')?.hidden)panel.append(build);
     }else if(plan.complete){
       panel.append(element('h3','You practiced every sentence in this plan.'),element('p','Keep listening and reviewing. Completing the plan is not a pronunciation grade.'));
       for(const review of plan.review){
@@ -50,7 +52,7 @@ async function refreshLessonPlan(){
     }
     const details=element('details');details.open=wasExpanded;details.append(element('summary','See the ordered sentences and plan options'));
     if(practicePage)details.append(element('p',plan.based_on));
-    if(practicePage && !starting)details.append(element('p',plan.explanation));
+    if(practicePage)details.append(element('p',plan.explanation));
     let group=null,list=null;
     for(const step of plan.steps){
       if(group!==step.lesson_number){

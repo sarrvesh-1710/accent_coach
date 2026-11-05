@@ -1,6 +1,6 @@
 # Three-sentence start and structured lessons
 
-**Recording review:** a live sound-level meter appears while recording. Listen locally, then choose Record again, Discard recording, or Confirm and analyze. Audio is uploaded only after confirmation. See [recording controls](docs/RECORDING_REVIEW.md).
+**Recording review:** the lesson plan sits above one recording-and-feedback workspace. A live sound meter and local replay help check capture before confirming. Results distinguish recording quality, recognized words, and possible target-sound differences. Retry and Next appear below the analysis; skipping an unclear sentence leaves it incomplete. Audio is uploaded only after confirmation. See [recording controls](docs/RECORDING_REVIEW.md).
 
 New learners start with three sentences covering TH, IH and AE, with feedback after each. Build my lesson plan then orders the remaining nine sentences using personal results and goals. Skip the starting check to use a full twelve-sentence plan. Existing plans stay intact. Try the new flow as `demo_assessment` / `demo-practice-403!` at http://127.0.0.1:7864/practice. See [the starting-check guide](docs/STARTING_CHECK.md). See [the lesson-plan guide](docs/LESSON_PLAN.md).
 

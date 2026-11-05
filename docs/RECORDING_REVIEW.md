@@ -63,8 +63,20 @@ Node is required only for the client tests, not for the deployed Python app.
 
 ## Practice page guidance
 
-The page follows Listen, Record, then Review and confirm. The selected sentence is displayed prominently. Sentence and mode selection, WAV upload, and full plan options are expandable so the main path stays clear. Stop appears only during capture or a microphone request; a local draft replaces the initial Record action with review actions. Incoming recordings scroll to the review area and focus confirmation, without submitting it.
+The page uses a compact lesson plan above one shared workspace. The selected sentence is displayed prominently during recording. Sentence and mode selection, WAV upload, and full plan options are expandable so the main path stays clear. Stop appears only during capture or a microphone request; a local draft replaces the initial Record action with review actions. Analysis then replaces capture controls within the same workspace. Incoming recordings scroll to the review area and focus confirmation, without submitting it.
 
 ## Inline analysis results
 
-Confirming a preset recording immediately opens its processing panel. It refreshes automatically and brings completed feedback into view, including the target sound, assessment reason, practice tip, current completed/total sentence count, and Next sentence action. Completed uncertain sound feedback counts as practice, not mastery. Failed processing does not advance the plan. Existing in-plan uncertain analyses omitted by older progress rules are counted on the next plan read; pre-plan history remains excluded. Saved attempts can also be opened at `/practice?attempt=ATTEMPT_ID`.
+Confirming a preset recording immediately opens its processing panel. It refreshes automatically and brings completed feedback into view, including recording quality, understood words, target-sound evidence, and Retry/Next actions beneath the analysis with the completed/total sentence count. Completed uncertain sound feedback counts as practice, not mastery. Failed processing does not advance the plan. Existing in-plan uncertain analyses omitted by older progress rules are counted on the next plan read; pre-plan history remains excluded. Saved attempts can also be opened at `/practice?attempt=ATTEMPT_ID`.
+
+## Unified practice workspace
+
+Practice has two main areas: a compact lesson plan at the top, followed by one shared workspace for speaking, local review, processing, and feedback. During result review the capture controls are hidden. Sentence/mode selection, listening examples, uploads, technical details, deletion, and optional sound reviews are expandable rather than competing with the main action.
+
+Before upload, the microphone meter can report detected sound or loud peaks; it cannot establish that speech was understood. The local review says what was detected and asks the learner to listen before confirmation. Uploaded files are labeled selected, with quality checks still pending.
+
+After analysis, the feedback separates recording quality, recognized words (including expected versus recognized differences), and target-sound evidence. Silence, saturation warnings, unavailable quality checks, unconfirmed content, and inconclusive model evidence never become confirmed pronunciation errors. A possible sound substitution is shown only when usable recording quality, confirmed content, and a separate alternative-favored target assessment are all present. Supported evidence concerns the target sound, not the entire word or sentence.
+
+Retry and Next appear below the analysis. A learner may skip forward after an unclear result; the button explicitly says skip for now and the sentence remains incomplete. The learner is returned to unfinished sentences later. Starting-check completion still requires three analyzed starting sentences; skipping the entire starting check remains available in plan options. Custom/free-speech feedback uses the same recording and word checks but does not award preset lesson progress.
+
+Confirmed analysis publishes only status, reason, and warning codes for recording quality, plus a content-verification status. These metadata are cleared whenever the recording/transcript revision changes or analysis restarts. Original audio, model scoring, and Sarvesh’s alignment optimizations are unchanged.

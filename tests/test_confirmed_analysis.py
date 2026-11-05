@@ -86,6 +86,9 @@ class ConfirmedAnalysisTests(unittest.TestCase):
         r = self.run_worker()
         self.assertTrue(r["ok"], r)
         self.assertEqual(r["analysis_status"], "completed")
+        self.assertEqual(r["recording_quality"]["status"], "ok")
+        self.assertEqual(set(r["recording_quality"]), {"status","reason","warnings"})
+        self.assertEqual(r["content_status"], "match")
         self.assertEqual(self.align.call_args.args[1], "think think")
         self.assertEqual(r["confirmed_text"], "Think think.")
         for k in ("attempt_id", "job_id", "input_revision", "learner_audio_id", "source_audio_sha256"):
@@ -149,6 +152,7 @@ class ConfirmedAnalysisTests(unittest.TestCase):
             self.snapshot["transcription"].update(change)
             r = self.run_worker()
             self.assertTrue(r["ok"])
+            self.assertEqual(r["content_status"], "unavailable")
             self.assertEqual({x["outcome"] for x in r["sound_results"]}, {"inconclusive"})
             self.snapshot["transcription"] = original
 

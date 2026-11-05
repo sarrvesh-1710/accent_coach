@@ -168,6 +168,17 @@ class PracticeSessionTests(unittest.TestCase):
         finally:
             for _ in range(acquired):jobs.slots.release()
 
+    def test_quality_feedback_is_published_and_cleared_on_transcript_revision(self):
+        self.create();self.confirm();token=self.client.cookies['accent_session'];revision=self.state['input_revision']
+        receipt=self.store.begin_practice_job(token,self.id,revision,'analysis')
+        snapshot=self.store.job_snapshot(token,self.id,receipt['job_id'],revision,'analysis')
+        self.store.publish_job(token,snapshot,'analysis',dict(ok=True,sound_results=[],recording_quality=dict(status='warning',reason=None,warnings=['possible_clipping']),content_status='match'))
+        state=self.client.get('/api/sessions/'+self.id).json()
+        self.assertEqual(state['recording_quality']['warnings'],['possible_clipping'])
+        self.assertEqual(state['content_status'],'match')
+        self.confirm('I think')
+        self.assertIsNone(self.state['recording_quality']);self.assertIsNone(self.state['content_status'])
+
     def test_profile_suggestions_use_practice_but_not_inconclusive(self):
         self.create();self.confirm();token=self.client.cookies['accent_session'];rev=self.state['input_revision']
         for outcome,expected in [('inconclusive',[]),('practice',['TH'])]:

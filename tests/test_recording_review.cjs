@@ -21,7 +21,7 @@ async function page(options={}){
     querySelectorAll(){return [];}
     pause(){} load(){} focus(){this.focused=true;}
   }
-  for(const id of ['lesson','input-mode','custom-text','recording-file','record','stop','mic-meter','mic-level','mic-feedback','mic-time','recording-review','preview','analyze','record-again','discard-recording','practice-status','attempt-result','session-panel','lesson-hint','example','custom-label','suggestions'])new Node(id);
+  for(const id of ['lesson','input-mode','custom-text','recording-file','record','stop','mic-meter','mic-level','mic-feedback','mic-time','recording-review','preview','analyze','record-again','discard-recording','practice-status','attempt-result','session-panel','lesson-hint','example','custom-label','suggestions','practice-capture','practice-workspace','recording-quality'])new Node(id);
   h.nodes.lesson.value='think';h.nodes['input-mode'].value='preset';h.nodes['custom-text'].value='I think so';
   const document={hidden:false,getElementById:id=>h.nodes[id] || null,
     querySelector:()=>({content:'test-csrf'}),querySelectorAll:()=>[h.nodes.preview,h.nodes.example],createElement:()=>new Node(),addEventListener(){}};
@@ -108,23 +108,26 @@ test('mode changes discard the old draft and confirmed custom recordings still r
 function allText(node){return [node.textContent,...node.children.map(allText)].join(' ');}
 test('analysis automatically reveals inline feedback, current progress and the next sentence',async()=>{
   let ready=false;
-  const h=await page({plan:{started:true,practiced:1,total:12,next:{lesson_id:'think_can',sentence:'I think I can'},steps:[{lesson_id:'think',practiced:true}]},get:url=>url==='/api/attempts/attempt1' ? {id:'attempt1',prompt_id:'think',sentence:'I think so',status:ready?'completed':'processing',result:ready?{target_assessment:{targets:[{word:'think',expected_phone:'TH',status:'insufficient_evidence',reason:'Recording may be distorted; record again.'}]}}:null}:undefined});
+  const h=await page({plan:{started:true,practiced:1,total:12,next:{lesson_id:'think_can',sentence:'I think I can'},steps:[{lesson_id:'think',practiced:true}]},get:url=>url==='/api/attempts/attempt1' ? {id:'attempt1',prompt_id:'think',sentence:'I think so',status:ready?'completed':'processing',result:ready?{learner_audio:{status:'warning',warnings:['possible_clipping']},spoken_words_verification:{status:'match',transcript:'I think so'},target_assessment:{targets:[{word:'think',expected_phone:'TH',status:'insufficient_evidence',reason:'Recording may be distorted; record again.'}]}}:null}:undefined});
   await h.upload();await h.nodes.analyze.fire('click');
   assert.match(allText(h.nodes['attempt-result']),/Results will appear here automatically/);
   assert.equal(h.nodes['attempt-result'].focused,true);
   ready=true;h.nodes['attempt-result'].focused=false;await h.timers.shift()();
   const text=allText(h.nodes['attempt-result']);
-  assert.match(text,/Your results/);assert.match(text,/1\/12 sentences complete/);
-  assert.match(text,/recording may be distorted/);assert.match(text,/marked as practiced/);
-  assert.match(text,/Next sentence: I think I can/);assert.match(text,/again \(optional\)/);
+  assert.match(text,/Your feedback/);assert.match(text,/1\/12 sentences complete/);
+  assert.match(text,/Recording may be distorted/);assert.match(text,/marked as practiced/);
+  assert.match(text,/Next sentence: I think I can/);assert.match(text,/Retry this sentence/);
   assert.equal(h.nodes['attempt-result'].focused,true);
+  assert.equal(h.nodes['practice-capture'].hidden,true);
+  assert.ok(text.indexOf('Could not assess this sound')<text.indexOf('Retry this sentence'));
+  assert.ok(text.indexOf('Could not assess this sound')<text.indexOf('Next sentence:'));
 });
 test('failed analysis shows zero progress and explains why a retry is needed',async()=>{
   const h=await page({plan:{started:true,practiced:0,total:12,next:{lesson_id:'think',sentence:'I think so'},steps:[]},get:url=>url==='/api/attempts/attempt1'?{id:'attempt1',prompt_id:'think',sentence:'I think so',status:'failed',message:'Alignment unavailable',result:null}:undefined});
   await h.upload();await h.nodes.analyze.fire('click');
   const text=allText(h.nodes['attempt-result']);
   assert.match(text,/0\/12 sentences complete/);assert.match(text,/Analysis could not finish/);
-  assert.match(text,/Try this sentence again/);assert.doesNotMatch(text,/marked as practiced/);
+  assert.match(text,/Retry this sentence/);assert.doesNotMatch(text,/marked as practiced/);
 });
 
 test('first preset confirmation starts the three-sentence check before creating an attempt',async()=>{
@@ -140,4 +143,33 @@ test('third starting result offers building a plan instead of another required r
   assert.doesNotMatch(text,/Try this sentence again:/);
   function find(node){return node.textContent==='Build my lesson plan'?node:node.children.map(find).find(Boolean);}
   await find(h.nodes['attempt-result']).fire('click');assert.equal(h.built,true);
+});
+
+test('local recording review distinguishes audible input, loud input and uploaded files',async()=>{
+  const h=await page();await h.nodes.record.fire('click');
+  h.microphone.callbacks.onLevel({status:'sound',hasSound:true,level:.5,seconds:1});
+  h.microphone.callbacks.onRecording(new Blob(['wav'],{type:'audio/wav'}));h.microphone.callbacks.onState('idle');
+  assert.match(h.nodes['recording-quality'].textContent,/Audio captured and sound was detected/);
+  await h.nodes['record-again'].fire('click');h.microphone.callbacks.onLevel({status:'loud',level:1,seconds:1});
+  h.microphone.callbacks.onRecording(new Blob(['wav'],{type:'audio/wav'}));h.microphone.callbacks.onState('idle');
+  assert.match(h.nodes['recording-quality'].textContent,/very loud peaks/);
+  await h.upload();assert.match(h.nodes['recording-quality'].textContent,/Audio file selected/);
+});
+
+test('unclear recordings allow moving on explicitly without pretending the sentence is complete',async()=>{
+  const h=await page({plan:{started:true,kind:'assessment',practiced:0,total:3,next:{lesson_id:'think',sentence:'I think so'},steps:[{lesson_id:'think',sentence:'I think so',available:true,practiced:false},{lesson_id:'ship',sentence:'The ship is here',available:true,practiced:false}]}});
+  await h.upload();await h.nodes.analyze.fire('click');
+  const text=allText(h.nodes['attempt-result']);
+  assert.match(text,/0\/3 starting sentences complete/);assert.match(text,/Next sentence \(skip for now\): The ship is here/);
+  assert.match(text,/leaves this sentence incomplete/);
+});
+test('custom speech uses the same quality-aware feedback and returns to recording safely',async()=>{
+  const h=await page({get:url=>url==='/api/sessions/session1'?{attempt_id:'session1',input_revision:2,recognized_text:'I think so',confirmed_text:'I think so',transcription_status:'completed',analysis_status:'completed',generation_status:null,sound_results:[{word:'think',expected_phone:'TH',outcome:'supported'}],recording_quality:{status:'ok'},content_status:'match',limitations:[],errors:{},timings:{}}:undefined});
+  h.nodes['input-mode'].value='free_speech';await h.nodes['input-mode'].fire('change');
+  await h.upload();await h.nodes.analyze.fire('click');
+  const text=allText(h.nodes['session-results']);
+  assert.match(text,/Recording captured successfully/,h.nodes['practice-status'].textContent);assert.match(text,/Sound looks on target/);
+  function find(node){return node.textContent==='Retry recording'?node:node.children.map(find).find(Boolean);}
+  await find(h.nodes['session-results']).fire('click');
+  assert.equal(h.nodes['session-panel'].hidden,true);assert.equal(h.nodes['practice-capture'].hidden,false);
 });

@@ -115,6 +115,7 @@ def run_confirmed_attempt(snapshot, settings):
             path = Path(work) / "learner.wav"
             path.write_bytes(raw)
             audio = timed("audio", audio_io.prepare_audio, path, settings)
+            result["recording_quality"]={k:audio.get(k) for k in ("status","reason","warnings")}
             if audio["status"] not in {"ok", "warning"}:
                 return fail("INVALID_AUDIO", "The learner recording could not be prepared.")
             fingerprint = prepare_audio(path, settings)[2]
@@ -126,6 +127,7 @@ def run_confirmed_attempt(snapshot, settings):
                              and asr.get("audio_sha256") == fingerprint and asr.get("model_id") == model_cfg.get("model_id")
                              and asr.get("model_revision") == model_cfg.get("revision") and bool(asr.get("model_revision"))
                              and recognized["ok"] and recognized["normalized_text"] == prepared["normalized_text"])
+            result["content_status"]="match" if content_match else "unavailable"
             result["transcription_provenance"] = {k: asr.get(k) for k in
                 ("status", "recognized_text", "source_audio_sha256", "audio_sha256", "model_id", "model_revision")}
             alignment = timed("alignment", align_audio, str(path), prepared["normalized_text"], settings, work)

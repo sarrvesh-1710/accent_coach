@@ -11,6 +11,6 @@ Cleanup review found these local and origin branches already fully included in p
 - parth/application-feedback at b4d6ebeb613e610b6e95ba32810b03a2c43c0543.
 - parth/profile-improvements at fac721979d86643f73bdc65e6627264ea71495ea.
 
-Both were checked for ancestry and matching local/remote tips; neither is checked out in an active worktree. Deletion is pending the user’s explicit confirmation. No branch deletion was performed. Other teammates’ branches and backup branches are retained.
+After explicit user confirmation on November 4, 2026, both branches were deleted locally and on origin. Their commits remain included in profile-system. Ancestry, matching local/remote tips, and worktree usage were rechecked immediately before deletion. The remote deletions were atomic and guarded by the exact verified tip hashes above. Other teammates’ branches, main, and backup branches are retained.
 
 Validation: the combined Python suite ran 234 tests (233 passed, one Windows symlink skip), including the imported worker/cache tests. Twenty client logic checks passed. The real speech/Kokoro integration rehearsal passed all 50 checks using public synthetic fixtures and temporary accounts. That run measured 35.27 seconds for analysis, 30.53 seconds for cold generation, and 0.58 seconds for warm generation; those figures validate this rehearsal only, not speed gains or human pronunciation accuracy. The imported speed implementation files match the source branch. The sample starting-check screen was also verified in the browser without accessing the physical microphone.

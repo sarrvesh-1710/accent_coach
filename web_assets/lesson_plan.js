@@ -11,7 +11,7 @@ async function refreshLessonPlan(){
     currentLessonPlan=plan;
     const starting=plan.kind==='assessment';
     const mobileSummary=document.getElementById('mobile-plan-summary');
-    if(mobileSummary){mobileSummary.hidden=false;mobileSummary.textContent=`${starting ? 'Starting check' : 'Lesson plan'}: ${plan.practiced} of ${plan.total} complete`;} 
+    if(mobileSummary){mobileSummary.hidden=false;mobileSummary.textContent=`${starting ? 'Starting check' : 'Lesson plan'}: ${plan.practiced} of ${plan.total} complete`;}
     const heading=document.getElementById('lesson-plan-heading');if(heading)heading.textContent=starting ? 'Your starting check' : 'My lesson plan';
     const selected=document.getElementById('lesson')?.value;
     const mode=document.getElementById('input-mode')?.value;

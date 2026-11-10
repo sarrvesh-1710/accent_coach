@@ -14,16 +14,17 @@ class Node {
   reportValidity(){this.reported=true;}
 }
 function harness() {
-  const nodes=Object.fromEntries(['profile-form','display-name','learner-profile','profile-save','profile-discard','profile-status','profile-selection','profile-heading-name','signed-in-name'].map(id=>[id,new Node()]));
+  const nodes=Object.fromEntries(['profile-actions','profile-form','display-name','learner-profile','profile-save','profile-discard','profile-status','profile-selection','profile-heading-name','signed-in-name'].map(id=>[id,new Node()]));
   nodes['display-name'].value='Alice';nodes['learner-profile'].value='general';
   const goals=['TH','IH','AE'].map(value=>{const node=new Node(value);node.checked=value==='TH';node.label=new Node();return node;});
   nodes['profile-form'].querySelectorAll=()=>goals;
   const requests=[];let responder=async payload=>({profile:{username:'alice',display_name:payload.display_name.trim(),goals:[...new Set(payload.goals)],learner_profile:payload.learner_profile}});
-  const context=vm.createContext({document:{getElementById:id=>nodes[id]||null},TypeError,
+  const windowEvents={},documentEvents={};let confirmResult=false;
+  const context=vm.createContext({window:{addEventListener:(n,fn)=>{windowEvents[n]=fn;},confirm:()=>confirmResult},document:{getElementById:id=>nodes[id]||null,addEventListener:(n,fn)=>{documentEvents[n]=fn;}},TypeError,
     api:async(url,options)=>{assert.equal(url,'/api/profile');const payload=JSON.parse(options.body);requests.push(payload);return responder(payload);}});
   vm.runInContext(fs.readFileSync(path.join(__dirname,'../web_assets/profile.js'),'utf8'),context);
   const emit=async name=>nodes['profile-form'].listeners[name]({preventDefault(){}});
-  return {nodes,goals,requests,emit,setResponder:fn=>{responder=fn;}};
+  return {nodes,goals,requests,emit,windowEvents,documentEvents,setConfirm:value=>{confirmResult=value;},setResponder:fn=>{responder=fn;}};
 }
 
 test('saved preferences start clean and show understandable sound selection',()=>{
@@ -70,4 +71,22 @@ test('displayed name is assigned as text, and clearing all goals stays general p
   const h=harness();h.nodes['display-name'].value='<script>test</script>';h.goals.forEach(node=>node.checked=false);await h.emit('change');await h.emit('submit');
   assert.equal(h.nodes['profile-heading-name'].textContent,'<script>test</script>');assert.deepEqual(h.requests[0].goals,[]);
   assert.match(h.nodes['profile-selection'].textContent,/general practice/);
+});
+
+test('dirty profile warns on browser departure and clears warning after save',async()=>{
+ const h=harness();h.nodes['display-name'].value='Unsaved';await h.emit('input');
+ let blocked=false;h.windowEvents.beforeunload({preventDefault(){blocked=true;}});assert.equal(blocked,true);
+ await h.emit('submit');blocked=false;h.windowEvents.beforeunload({preventDefault(){blocked=true;}});assert.equal(blocked,false);
+});
+test('profile navigation cancellation preserves edits; confirmed departure avoids double prompt',async()=>{
+ const h=harness();h.nodes['display-name'].value='Draft';await h.emit('input');
+ let prevented=false;const event={target:{closest:()=>({getAttribute:()=>null})},preventDefault(){prevented=true;}};
+ h.documentEvents.click(event);assert.equal(prevented,true);assert.equal(h.nodes['display-name'].value,'Draft');
+ h.setConfirm(true);h.documentEvents.click(event);let warned=false;h.windowEvents.beforeunload({preventDefault(){warned=true;}});assert.equal(warned,false);
+});
+
+test('clean profile hides the action container and edits reveal it without reserved space',async()=>{
+ const h=harness();assert.equal(h.nodes['profile-actions'].hidden,true);
+ h.nodes['display-name'].value='Edited';await h.emit('input');assert.equal(h.nodes['profile-actions'].hidden,false);
+ h.nodes['profile-discard'].listeners.click();assert.equal(h.nodes['profile-actions'].hidden,true);
 });

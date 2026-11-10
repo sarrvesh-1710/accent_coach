@@ -10,10 +10,26 @@
   const status = document.getElementById('profile-status');
   const selection = document.getElementById('profile-selection');
   const values = () => ({display_name:name.value, goals:goals.filter(node=>node.checked).map(node=>node.value), learner_profile:guidance.value});
-  let saved = values(), busy = false;
+  let saved = values(), busy = false, leaving=false;
   const changed = () => JSON.stringify(values()) !== JSON.stringify(saved);
+  const hasUnsaved=()=>!leaving && (busy || changed());
+  if(typeof window!=='undefined')window.addEventListener('beforeunload',event=>{
+    if(!hasUnsaved())return;
+    event.preventDefault();event.returnValue='';
+  });
+  document.addEventListener?.('click',event=>{
+    const link=event.target.closest?.('a[href]');
+    if(!link || link.getAttribute?.('target')==='_blank' || link.getAttribute?.('href')?.startsWith('#') || event.ctrlKey || event.metaKey || !hasUnsaved())return;
+    if(window.confirm('Leave without saving your profile changes?'))leaving=true;else event.preventDefault();
+  });
+  document.addEventListener?.('submit',event=>{
+    if(event.target===form || !hasUnsaved())return;
+    if(window.confirm('Leave without saving your profile changes?'))leaving=true;else event.preventDefault();
+  });
   function update() {
     const dirty = changed();
+    save.hidden = !busy && !dirty;discard.hidden = !busy && !dirty;
+    const actions=document.getElementById('profile-actions');if(actions)actions.hidden=!busy && !dirty;
     save.disabled = busy || !dirty;
     discard.disabled = busy || !dirty;
     name.disabled = busy;
@@ -26,7 +42,7 @@
   function edited() {
     name.setCustomValidity('');
     status.classList.remove('form-error');
-    status.textContent=changed() ? 'You have unsaved changes.' : 'Your profile is up to date.';
+    status.textContent=changed() ? 'You have unsaved changes.' : 'All changes saved.';
     update();
   }
   form.addEventListener('input',edited);

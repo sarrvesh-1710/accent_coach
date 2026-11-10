@@ -1,3 +1,11 @@
+# Current laptop demo snapshot: demo-1 (November 10, 2026)
+
+Use **[docs/DEMO_1_START_HERE.md](docs/DEMO_1_START_HERE.md)** to clone this snapshot, recreate the local Windows speech environment, and understand the Azure handoff. This branch contains the current recording UI, private profiles/lesson plans/History, playback fixes and optional AI coaching. The existing optimized speech code is preserved. Models, local machine settings, credentials and private learner data are not included.
+
+The application is still localhost-bound. Publishing this code does not deploy a public website or establish Azure performance. Start with the current guide; the dated sections below are historical.
+
+---
+
 # Accent Coach: team handoff, November 2, 2026
 
 Start with [the current teammate setup and walkthrough](docs/TEAM_START_HERE_2026-11-02.md). The reviewed application work is published on `feature/speed-free-speech`; this does not imply a merge into `main` or the other feature branches. The integrated site includes Practice results, private History/playback, profile preferences, American practice guides, and opt-in MFA resource/process reuse.

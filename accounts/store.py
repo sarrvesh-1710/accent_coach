@@ -12,6 +12,7 @@ import uuid
 from argon2 import PasswordHasher
 from argon2.exceptions import VerificationError, InvalidHashError
 from accounts.sessions import SessionMethods
+from accounts.background import DEFAULT, validate_background
 
 GOALS = ('TH', 'IH', 'AE')
 
@@ -40,6 +41,15 @@ class Store(SessionMethods):
                     status TEXT NOT NULL, message TEXT NOT NULL, audio BLOB,
                     result TEXT, deleted INTEGER NOT NULL DEFAULT 0);
                 CREATE INDEX IF NOT EXISTS owner_attempts ON attempts(user_id, created);
+                CREATE TABLE IF NOT EXISTS learning_preferences (
+                    user_id TEXT PRIMARY KEY REFERENCES users(id), country TEXT NOT NULL DEFAULT '',
+                    language TEXT NOT NULL DEFAULT '', use_starters INTEGER NOT NULL DEFAULT 1);
+                CREATE TABLE IF NOT EXISTS lesson_plans (
+                    user_id TEXT PRIMARY KEY REFERENCES users(id), body TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS lesson_plan_steps (
+                    user_id TEXT NOT NULL REFERENCES users(id), plan_id TEXT NOT NULL,
+                    prompt_id TEXT NOT NULL, attempt_id TEXT NOT NULL REFERENCES attempts(id),
+                    PRIMARY KEY(user_id,plan_id,prompt_id,attempt_id));
                 CREATE TABLE IF NOT EXISTS auth_limits (
                     key TEXT PRIMARY KEY, started REAL NOT NULL, count INTEGER NOT NULL);
                 CREATE TABLE IF NOT EXISTS practice_preferences (
@@ -77,7 +87,8 @@ class Store(SessionMethods):
             db.execute('INSERT INTO auth_limits VALUES (?, ?, 1) ON CONFLICT(key) DO UPDATE SET count=count+1', (key, now))
             return True
 
-    def register(self, username, password, display_name):
+    def register(self, username, password, display_name, *, background=None):
+        background=validate_background(DEFAULT if background is None else background)
         username = username.strip().lower()
         display_name = display_name.strip()
         if not re.fullmatch(r'[a-z0-9_]{3,32}', username):
@@ -92,6 +103,7 @@ class Store(SessionMethods):
             with self.connect() as db:
                 db.execute('INSERT INTO users (id,username,password,display_name) VALUES (?,?,?,?)',
                            (user_id, username, hashed, display_name))
+                self._write_background(db,user_id,background)
         except sqlite3.IntegrityError:
             raise ValueError('That username is already taken.') from None
         return user_id
@@ -150,7 +162,18 @@ class Store(SessionMethods):
                             job['status']='cancelled';state[kind+'_status']='cancelled';changed=True
                     if changed:self._save_practice(db,state)
 
-    def profile(self, owner, display_name, goals, *, learner_profile=None):
+    def background(self,owner):
+        with self.connect() as db:
+            row=db.execute('SELECT language,use_starters FROM learning_preferences WHERE user_id=?',(owner,)).fetchone()
+        return dict(language='other' if row['language']=='english' else row['language'],use_starters=bool(row['use_starters'])) if row else dict(DEFAULT)
+
+    @staticmethod
+    def _write_background(db,owner,value):
+        db.execute('INSERT INTO learning_preferences VALUES (?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET country=excluded.country,language=excluded.language,use_starters=excluded.use_starters',
+            (owner,'',value['language'],int(value['use_starters'])))
+
+    def profile(self, owner, display_name, goals, *, learner_profile=None, background=None):
+        if background is not None: background=validate_background(background)
         if not isinstance(display_name, str) or not 1 <= len(display_name.strip()) <= 60:
             raise ValueError('Enter a display name of 1–60 characters.')
         if not isinstance(goals, list) or any(g not in GOALS for g in goals):
@@ -162,6 +185,7 @@ class Store(SessionMethods):
             db.execute('BEGIN IMMEDIATE')
             db.execute('UPDATE users SET display_name=?,goals=? WHERE id=?',
                        (display_name.strip(), json.dumps(list(dict.fromkeys(goals))), owner))
+            if background is not None:self._write_background(db,owner,background)
             if learner_profile is not None:
                 db.execute('''INSERT INTO practice_preferences VALUES (?,?)
                     ON CONFLICT(user_id) DO UPDATE SET learner_profile=excluded.learner_profile''',
@@ -205,9 +229,13 @@ class Store(SessionMethods):
         message = error or ('Processing failed. Your recording is saved; check the result for details.' if status == 'failed'
                             else 'Analysis finished. Recording and results are saved to your account.')
         with self.connect() as db:
-            return db.execute("""UPDATE attempts SET status=?,message=?,result=? WHERE id=? AND user_id=?
+            changed = db.execute("""UPDATE attempts SET status=?,message=?,result=? WHERE id=? AND user_id=?
                 AND deleted=0 AND status IN ('queued','processing')""",
                 (status, message, json.dumps(result, ensure_ascii=False, allow_nan=False) if result else None, identity, owner)).rowcount == 1
+            if changed and status=='completed':
+                from accounts.lesson_plan import record_completion
+                record_completion(db,owner,identity,result)
+            return changed
 
     def delete_attempt(self, owner, identity):
         with self.connect() as db:

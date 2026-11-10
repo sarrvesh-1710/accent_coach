@@ -16,22 +16,22 @@ import uvicorn
 from site_pages import ASSETS, help_page, not_found_page, privacy_page, terms_page
 
 
-def create_site(demo=None, theme=None, css=None, *, data_root=None, analyzer=None, prompts=None, speech=None, generator=None):
+def create_site(demo=None, theme=None, css=None, *, data_root=None, analyzer=None, prompts=None, speech=None, generator=None, coaching_config=None, coaching_provider=None):
     from accounts.web import private_site
-    site = private_site(data_root=data_root, analyzer=analyzer, prompts=prompts,speech=speech,generator=generator)
+    site = private_site(data_root=data_root, analyzer=analyzer, prompts=prompts,speech=speech,generator=generator,coaching_config=coaching_config,coaching_provider=coaching_provider)
     site.add_middleware(GZipMiddleware, minimum_size=1000)
 
     @site.get('/help', response_class=HTMLResponse)
-    def help_route():
-        return help_page()
+    def help_route(request: Request):
+        return HTMLResponse(site.state.decorate_information_page(request, help_page()),headers={"Cache-Control":"private, no-store","Vary":"Cookie"})
 
     @site.get('/privacy', response_class=HTMLResponse)
-    def privacy_route():
-        return privacy_page()
+    def privacy_route(request: Request):
+        return HTMLResponse(site.state.decorate_information_page(request, privacy_page()),headers={"Cache-Control":"private, no-store","Vary":"Cookie"})
 
     @site.get('/terms', response_class=HTMLResponse)
-    def terms_route():
-        return terms_page()
+    def terms_route(request: Request):
+        return HTMLResponse(site.state.decorate_information_page(request, terms_page()),headers={"Cache-Control":"private, no-store","Vary":"Cookie"})
 
     @site.get('/favicon.ico', include_in_schema=False)
     def favicon():

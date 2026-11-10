@@ -1,6 +1,7 @@
 """Authenticated website and private playback; no Gradio file cache is exposed."""
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
+import asyncio
 import html
 import hashlib
 import io
@@ -85,7 +86,7 @@ class Jobs:
         self.pool.shutdown(wait=True)
 
 
-def private_site(data_root=None, analyzer=None, prompts=None, speech=None, generator=None):
+def private_site(data_root=None, analyzer=None, prompts=None, speech=None, generator=None, coaching_config=None, coaching_provider=None):
     if analyzer is None:
         from analysis_service import run_attempt
         analyzer = run_attempt
@@ -96,6 +97,8 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
     store = Store(data_root or os.environ.get('ACCENT_COACH_DATA_DIR', ROOT / 'private_data'))
     jobs = Jobs(store, analyzer)
     practice_jobs = PracticeJobs(store,speech,generator,pool=jobs.pool,slots=jobs.slots)
+    from ai_coaching.service import CoachingService
+    coaching=CoachingService(store,catalog,coaching_config,coaching_provider)
 
     @asynccontextmanager
     async def lifespan(app):
@@ -105,6 +108,7 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
         if work.exists():
             remove_private_work(work,store.root)
         yield
+        await coaching.close()
         jobs.close()
         practice_jobs.close()
         from analysis_service import SERVICE
@@ -112,6 +116,7 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
 
     site = FastAPI(title='Accent Coach', docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     site.state.store, site.state.jobs, site.state.practice_jobs = store, jobs, practice_jobs
+    site.state.result_coaching=coaching
     site.add_middleware(TrustedHostMiddleware, allowed_hosts=['localhost', '127.0.0.1', '[::1]'])
 
     @site.middleware('http')
@@ -149,26 +154,45 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
                 raise HTTPException(413, 'This upload is too large.')
         return bytes(data)
 
-    async def json_body(request):
+    async def json_body(request, allow_empty=False):
         try:
-            value = json.loads(await read_body(request, 8192))
+            raw = await read_body(request, 8192)
+            value = {} if allow_empty and not raw else json.loads(raw)
         except (ValueError, UnicodeError):
             raise HTTPException(422, 'Invalid request.') from None
         if not isinstance(value, dict):
             raise HTTPException(422, 'Invalid request.')
         return value
 
+    def account_menu(user):
+        if not user: return ''
+        return f'<details class="account-menu"><summary><span id="signed-in-name">Signed in as {html.escape(user["display_name"])}</span></summary><div class="account-menu-panel"><a href="/profile">My profile</a><a href="/history">My history</a><form action="/logout" method="post"><input type="hidden" name="csrf" value="{user["csrf"]}"><button>Sign out</button></form></div></details>'
+
+    def decorate_information_page(request, content):
+        user=current(request)
+        if not user: return content
+        revision=hashlib.sha256((ASSETS/'ui-polish.css').read_bytes()).hexdigest()[:12]
+        return content.replace('</header>',account_menu(user)+'</header>',1).replace('</head>',f'<link rel="stylesheet" href="/site-assets/accounts.css"><link rel="stylesheet" href="/site-assets/ui-polish.css?v={revision}"></head>')
+
+    site.state.decorate_information_page=decorate_information_page
+
     def shell(title, body, path, user=None, token=None):
-        account_nav = '<nav class="account-nav" aria-label="Account">'
-        if user:
-            account_nav += f'<span id="signed-in-name">Signed in as {html.escape(user["display_name"])}</span><form action="/logout" method="post"><input type="hidden" name="csrf" value="{user["csrf"]}"><button>Sign out</button></form>'
-        account_nav += '</nav>'
+        account_nav = account_menu(user)
         meta = f'<meta name="csrf-token" content="{html.escape(user["csrf"] if user else (token or ""), quote=True)}">'
         content = page_html(title, 'Private English pronunciation practice and saved recordings.',
-                            (account_nav if user else '') + body, path)
+                            body, path)
+        if user:
+            content = content.replace('</header>', account_nav + '</header>', 1).replace('class="document"', 'class="document account-document"', 1)
         css_version = hashlib.sha256((ASSETS / 'accounts.css').read_bytes()).hexdigest()[:12]
         js_version = hashlib.sha256((ASSETS / 'accounts.js').read_bytes()).hexdigest()[:12]
-        return content.replace('</head>', meta + f'<link rel="stylesheet" href="/site-assets/accounts.css?v={css_version}"><script src="/site-assets/accounts.js?v={js_version}" defer></script></head>')
+        polish_version = hashlib.sha256((ASSETS / 'ui-polish.css').read_bytes()).hexdigest()[:12]
+        coach_settings=coaching.config.public()
+        coach_meta='<meta name="coach-settings" content="'+html.escape(json.dumps(coach_settings),quote=True)+'">'
+        coach_script=''
+        if coach_settings['available']:
+            coach_version=hashlib.sha256((ASSETS/'result_coach.js').read_bytes()).hexdigest()[:12]
+            coach_script=f'<script src="/site-assets/result_coach.js?v={coach_version}" defer></script>'
+        return content.replace('</head>', meta + coach_meta + f'<link rel="stylesheet" href="/site-assets/accounts.css?v={css_version}"><link rel="stylesheet" href="/site-assets/ui-polish.css?v={polish_version}"><script src="/site-assets/microphone.js?v={js_version}" defer></script><script src="/site-assets/accounts.js?v={js_version}" defer></script>{coach_script}</head>')
 
     def auth_page(request, signup=False, error='', status=200):
         token = request.cookies.get('accent_login_csrf') or secrets.token_urlsafe(32)
@@ -243,23 +267,25 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
         if not user:
             return RedirectResponse('/login', status_code=303)
         options = ''.join(f'<option value="{html.escape(p["id"], quote=True)}">{html.escape(p["text"])}</option>' for p in prompts)
-        body = f'''<h1>Practice English pronunciation.</h1><p>Choose a sentence, record up to five seconds, then review your saved result.</p>
-        <section class="account-card" id="practice-guide"><h2>American sound practice</h2>
+        body = f'''<header class="practice-intro"><svg class="brand-wave" viewBox="0 0 100 32" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M4 14v4m10-9v14m10-19v24m10-16v8m10-18v28m10-21v14m10-11v8m10-16v24m10-18v12m10-8v4"/></svg><p class="eyebrow">Your daily practice</p><h1>Practice English pronunciation.</h1><p>Record a short sentence. Review your words. Find one sound to practice next.</p><div class="practice-limits"><span>General American English</span><span>Up to 5 seconds</span><span>Private recordings</span></div></header><div id="mobile-plan-summary" class="mobile-plan-summary" role="status" hidden></div><div class="practice-layout"><div class="practice-main">
+        <details class="account-card guide-card" id="practice-guide"><summary>Explore American sound guides</summary><h2>American sound practice</h2>
         <p id="guide-profile"></p><label for="guide-sentence">Choose a sound guide</label><select id="guide-sentence"></select>
         <div id="guide-target"></div><button id="use-guide" type="button">Practice these words</button>
-        <p id="guide-status" role="status"></p></section>
-        <section class="account-card"><label for="input-mode">Practice mode</label><select id="input-mode"><option value="preset">Preset lesson</option><option value="custom_text">My own sentence</option><option value="free_speech">Free speech</option></select>
+        <p id="guide-status" role="status"></p></details>
+        <section id="recording-workspace" class="account-card recording-workspace" aria-labelledby="practice-heading"><p class="eyebrow">01 / Make a recording</p><h2 id="practice-heading">Record your sentence</h2><details id="practice-settings" class="practice-settings" open><summary id="settings-summary">Lesson settings &middot; Choose a mode</summary><label for="input-mode">Practice mode</label><select id="input-mode"><option value="preset">Preset lesson</option><option value="custom_text">My own sentence</option><option value="free_speech">Free speech</option></select>
         <label id="lesson-label" for="lesson">Practice sentence</label><select id="lesson">{options}</select>
         <label id="custom-label" hidden>My sentence (up to 12 words and 200 characters)<textarea id="custom-text" maxlength="200" rows="3"></textarea></label>
-        <p id="lesson-hint"></p><audio id="example" controls></audio><p id="example-label">Synthetic listening example; not used to score your voice.</p>
-        <div class="record-actions"><button id="record">Record my voice</button><button id="stop" disabled>Stop recording</button></div>
-        <label>Or upload a WAV<input id="recording-file" type="file" accept=".wav,audio/wav"></label>
-        <audio id="preview" controls hidden></audio><button id="analyze" class="primary" disabled>Check and save my recording</button>
-        <p id="practice-status" role="status" aria-live="polite">Your recordings and results will appear in My history.</p></section>
+        </details><section class="speaking-exercise" aria-label="Sentence, listening example and recording"><div id="practice-phrase" class="practice-phrase practice-sentence" aria-live="polite"></div><p id="practice-focus" class="practice-focus" hidden></p><details class="listening-example"><summary>Listen to example</summary><p id="lesson-hint"></p><audio id="example" controls></audio><p id="example-label">Synthetic listening example; not used to score your voice.</p></details>
+        <div class="record-actions"><button id="record" class="record-button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="13" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg><span>Start recording</span></button><button id="stop" disabled hidden>Stop recording</button></div>
+        </section><details class="upload-option"><summary>Upload a WAV instead</summary><label>Up to 5 seconds and 10 MB<input id="recording-file" type="file" accept=".wav,audio/wav"></label></details>
+        <div id="mic-meter" hidden><output id="recording-timer" aria-label="Recording time" aria-live="off">0.0 / 5.0 seconds</output><meter id="mic-level" min="0" max="1"></meter><p id="mic-feedback" aria-live="off"></p></div><section id="recording-review" hidden aria-label="Review your recording"><h3>Your recording is ready</h3><p>Listen, then save it or try again.</p><audio id="preview" controls hidden></audio><button id="record-again" type="button">Record again</button><button id="discard-recording" type="button">Discard recording</button><button id="analyze" class="primary" disabled>Check and save my recording</button>
+        </section><p id="practice-status" role="status" aria-live="polite">Your recordings and results will appear in My history.</p></section>
         <section id="attempt-result" class="account-card" hidden></section>
         <section id="session-panel" class="account-card" hidden></section>
-        <section class="account-card"><h2>Practice next</h2><p id="suggestions">Set your practice goals in My profile.</p></section>'''
-        return HTMLResponse(shell('English pronunciation practice', body, '/practice', user))
+        <section id="practice-next-card" class="account-card"><h2 id="practice-next-heading">Practice next</h2><div id="suggestions">Set your practice goals in My profile.</div></section>'''
+        body += '</div><aside class="practice-sidebar"><section class="account-card plan-card"><p class="eyebrow">A path to follow</p><h2 id="lesson-plan-heading">My lesson plan</h2><div id="lesson-plan" aria-live="polite">Loading your plan...</div></section></aside></div>'
+        page = shell('English pronunciation practice', body, '/practice', user)
+        return HTMLResponse(page.replace('</head>', '<script src="/site-assets/lesson_plan.js" defer></script></head>'))
 
     @site.get('/profile')
     def profile_page(request: Request):
@@ -272,21 +298,23 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
         profile_options = ''.join(f'<option value="{key}" {"selected" if user["learner_profile"] == key else ""}>{html.escape(profile_guide(key)["label"])}</option>' for key in PROFILES)
         body = f'''<div class="profile-intro"><p class="eyebrow">Your learning preferences</p><h1>My profile</h1>
         <p>Choose how your name appears and the sounds you want to focus on.</p></div>
-        <section class="account-card profile-card"><header class="profile-header"><h2 id="profile-heading-name">{html.escape(user['display_name'])}</h2>
+        <div class="profile-layout"><section class="account-card profile-card"><header class="profile-header"><p class="eyebrow">Account details</p><h2 id="profile-heading-name">{html.escape(user['display_name'])}</h2>
         <p>Username: <strong>{html.escape(user['username'])}</strong></p></header>
         <form id="profile-form" class="account-form profile-form">
-        <label for="display-name">Display name<input id="display-name" name="display_name" value="{html.escape(user['display_name'], quote=True)}" maxlength="60" required autocomplete="nickname" aria-describedby="display-name-help"></label>
-        <p id="display-name-help" class="profile-help">1–60 characters. This is the name shown when you sign in.</p>
-        <div class="profile-accent"><h3>Target accent</h3><p>General American English</p></div>
+        <fieldset class="profile-group" aria-label="Account details"><label for="display-name">Display name<input id="display-name" name="display_name" value="{html.escape(user['display_name'], quote=True)}" maxlength="60" required autocomplete="nickname" aria-describedby="display-name-help"></label>
+        <p id="display-name-help" class="profile-help">1 to 60 characters. This is the name shown when you sign in.</p>
+        </fieldset><fieldset class="profile-group"><legend>Practice preferences</legend><div class="profile-accent"><h3>Target accent</h3><p>General American English</p></div>
         <label for="learner-profile">Optional learner guidance<select id="learner-profile">{profile_options}</select></label>
-        <p class="profile-help">This preference changes practice guidance only. It does not infer your language or change grading. Mandarin-specific calibrated ratings are not enabled.</p>
+        <details class="profile-guidance-help"><summary>About learner guidance</summary><p class="profile-help">This preference changes practice guidance only. It does not infer your language or change grading. Mandarin-specific calibrated ratings are not enabled.</p></details>
         <fieldset aria-describedby="profile-goals-help"><legend>Sounds I want to practice</legend>
         <div class="profile-goals">{goals}</div></fieldset>
         <p id="profile-goals-help" class="profile-help">Choose sounds to focus on, or leave them unchecked for general practice. These preferences guide suggestions; they are not pronunciation results.</p>
         <p id="profile-selection" class="profile-selection" aria-live="polite"></p>
-        <div class="profile-actions"><button id="profile-save" class="primary" disabled>Save changes</button><button id="profile-discard" type="button" disabled>Discard changes</button></div>
-        <p id="profile-status" role="status" aria-live="polite">Your profile is up to date.</p></form></section>'''
+        </fieldset><div id="profile-actions" class="profile-actions"><button id="profile-save" class="primary" disabled>Save changes</button><button id="profile-discard" type="button" disabled>Discard changes</button></div>
+        <p id="profile-status" role="status" aria-live="polite">All changes saved.</p></form></section>'''
+        body += '<aside class="profile-plan"><section class="account-card plan-card"><h2 id="lesson-plan-heading">My lesson plan</h2><div id="lesson-plan"></div></section></aside></div><section class="account-card"><h2>Your latest sound checks</h2><div id="profile-progress"></div></section>'
         page = shell('My profile', body, '/profile', user)
+        page = page.replace('</head>', '<script src="/site-assets/lesson_plan.js" defer></script><script src="/site-assets/coaching.js" defer></script></head>')
         css_version = hashlib.sha256((ASSETS / 'profile.css').read_bytes()).hexdigest()[:12]
         js_version = hashlib.sha256((ASSETS / 'profile.js').read_bytes()).hexdigest()[:12]
         return HTMLResponse(page.replace('</head>', f'<link rel="stylesheet" href="/site-assets/profile.css?v={css_version}"><script src="/site-assets/profile.js?v={js_version}" defer></script></head>'))
@@ -298,7 +326,7 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
             return RedirectResponse('/login', status_code=303)
         body = '''<h1>My saved attempts</h1><p>Recordings and results stay here when you sign out or restart the app.</p>
         <p>Model feedback is experimental. Changes between attempts do not establish improvement.</p>
-        <p id="history-status" role="status"></p><div id="history-list"></div><section id="attempt-result" class="account-card" hidden></section><section id="session-panel" class="account-card" hidden></section>'''
+        <div class="history-filters"><label>Find a sentence<input id="history-search" type="search" placeholder="Search your saved sentences"></label><label>Status<select id="history-filter"><option value="all">All statuses</option><option value="completed">Completed</option><option value="processing">Processing</option><option value="failed">Failed</option></select></label></div><p id="history-status" role="status"></p><div id="history-list"></div><section id="attempt-result" class="account-card" hidden></section><section id="session-panel" class="account-card" hidden></section>'''
         return HTMLResponse(shell('My history', body, '/history', user))
 
     @site.get('/api/me')
@@ -318,10 +346,58 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
         saved = require(request)
         return {'ok': True, 'profile': {k: saved[k] for k in ('username', 'display_name', 'goals', 'learner_profile')}}
 
+    @site.get('/api/profile/progress')
+    def progress_profile(request: Request):
+        from accounts.coaching import profile_progress
+        return profile_progress(store,require(request)['id'],prompts)
+
+    @site.get('/api/lesson-plan')
+    def lesson_plan(request:Request):
+        from accounts.lesson_plan import get_plan
+        return get_plan(store,require(request)['id'],prompts)
+
+    @site.post('/api/lesson-plan/start')
+    async def begin_plan(request:Request):
+        from accounts.lesson_plan import start_plan,get_plan
+        user=require(request);csrf(request,request.headers.get('x-csrf-token'),user['csrf'])
+        options=await json_body(request,allow_empty=True)
+        skip=options.get('skip_starting_check',False)
+        if type(skip) is not bool:raise HTTPException(422,'Choose whether to skip the starting check.')
+        try:start_plan(store,user['id'],prompts,assessment=not skip)
+        except ValueError as exc:raise HTTPException(422,str(exc)) from None
+        return get_plan(store,user['id'],prompts)
+
+    @site.post('/api/lesson-plan/build')
+    async def build_plan(request:Request):
+        from accounts.lesson_plan import build_personalized_plan
+        user=require(request);csrf(request,request.headers.get('x-csrf-token'),user['csrf'])
+        try:return build_personalized_plan(store,user['id'],prompts)
+        except ValueError as exc:raise HTTPException(422,str(exc)) from None
+
+    @site.post('/api/lesson-plan/skip')
+    async def skip_check(request:Request):
+        from accounts.lesson_plan import get_plan,start_plan
+        user=require(request);csrf(request,request.headers.get('x-csrf-token'),user['csrf'])
+        plan=get_plan(store,user['id'],prompts)
+        if plan['kind']=='assessment':
+            try:
+                start_plan(store,user['id'],prompts,restart=plan['started'],assessment=False,expected_plan_id=plan['plan_id'])
+            except ValueError as exc:raise HTTPException(422,str(exc)) from None
+        return get_plan(store,user['id'],prompts)
+
+    @site.post('/api/lesson-plan/restart')
+    async def restart_plan(request:Request):
+        from accounts.lesson_plan import start_plan,get_plan
+        user=require(request);csrf(request,request.headers.get('x-csrf-token'),user['csrf'])
+        if (await json_body(request)).get('restart') is not True:raise HTTPException(422,'Confirm starting a new plan.')
+        try:start_plan(store,user['id'],prompts,restart=True,assessment=False)
+        except ValueError as exc:raise HTTPException(422,str(exc)) from None
+        return get_plan(store,user['id'],prompts)
+
     @site.get('/api/lessons')
     def lessons(request: Request):
         require(request)
-        return [{'id': p['id'], 'text': p['text'], 'hint': p.get('practice_tip', '')} for p in prompts]
+        return [{'id': p['id'], 'text': p['text'], 'hint': p.get('practice_tip', ''), 'target_words':p.get('target_words',[]), 'target_phones':p.get('target_phones',[])} for p in prompts]
 
     @site.get('/api/suggestions')
     def suggestions(request: Request):
@@ -387,6 +463,23 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
     @site.get('/api/attempts/{identity}')
     def get_attempt(request: Request, identity: str):
         return own_attempt(request, identity)
+
+    @site.post('/api/attempts/{identity}/coaching')
+    async def explain_result(request:Request,identity:str):
+        from ai_coaching.contract import CoachingRequest
+        from pydantic import ValidationError
+        timeout=min(max(coaching.config.timeout,0.1),5)
+        if not 0.1<=timeout<=5:timeout=5
+        try:
+            # Include authentication and request decoding in the optional deadline.
+            async with asyncio.timeout(timeout):
+                user=await asyncio.to_thread(require,request)
+                csrf(request,request.headers.get('x-csrf-token'),user['csrf'])
+                try:options=CoachingRequest.model_validate(await json_body(request))
+                except ValidationError:raise HTTPException(422,'Invalid explanation request.') from None
+                return await coaching.explain(request.cookies.get(COOKIE),identity,**options.model_dump())
+        except TimeoutError:return dict(status='unavailable',code='timeout')
+        except PermissionError:raise HTTPException(404,'Attempt not found.') from None
 
     @site.get('/api/attempts/{identity}/audio')
     def get_audio(request: Request, identity: str):

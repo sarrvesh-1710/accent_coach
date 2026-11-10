@@ -51,3 +51,11 @@
 .recognized-words{margin-bottom:18px}.recognized-badge{display:inline-block;max-width:100%;padding:7px 10px;background:#f1f5f9;border:1px solid #dbe3e8;border-radius:6px;color:#334155;font-size:14px;overflow-wrap:anywhere}.recognized-words small{display:block;margin-top:6px;color:#52666c;font-size:12px}
 .troubleshooting{background:#f1f5f9;border:1px solid #dbe3e8;border-radius:12px;padding:24px;margin-top:32px}.troubleshooting h2{margin:0 0 16px}.faq-item{border-top:1px solid #d5dfe5}.faq-item summary{display:flex;justify-content:space-between;align-items:center;gap:16px;list-style:none;cursor:pointer;font-weight:600;padding:16px 0;min-height:48px}.faq-item summary::-webkit-details-marker{display:none}.faq-item summary::after{content:'';width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);flex-shrink:0;margin-right:4px}.faq-item[open] summary::after{transform:rotate(225deg)}.faq-item p{margin:0 0 18px;color:var(--muted)}.faq-item summary:focus-visible{outline:2px solid #0e4d40;outline-offset:3px}
 @media(max-width:760px){.troubleshooting{padding:18px}}
+
+.document{font-size:16px;line-height:1.75}.document>p{margin:0 0 22px}.document small{font-size:14px;color:#435a50}.document h1{font-size:clamp(32px,4vw,40px)}.privacy-summary{padding:22px 26px;background:#edf3ec;border:1px solid #d5e1d4;border-radius:10px;margin:26px 0 36px}.privacy-summary h2{margin-top:0}.privacy-summary p{font-size:14px;color:#435a50;margin-bottom:0}.how-icon{width:30px;height:30px;color:#0e4d40;margin-bottom:10px}.how-card .how-number{display:block;font-size:13px}.how-card p{font-size:16px}.faq-item summary{font-size:16px}.document:has(.privacy-summary){max-width:800px;margin:0 auto}
+
+body,button,input,select,textarea,.document h1,.document h2,.document h3,.document h4{font-family:"Segoe UI",Arial,sans-serif}.desktop-nav a,.mobile-nav a{font-size:16px;color:#374f47}.document h1{font-size:clamp(32px,3.5vw,36px)}
+
+.result-explanation{margin-top:24px!important}
+
+.how-step-header{display:flex;align-items:center;gap:12px;margin-bottom:14px}.how-step-header .how-icon{margin:0}.how-step-header .how-number{font-size:14px}.how-card p{margin-bottom:0}.how-details{margin:0 0 28px}.how-details summary{min-height:44px;font-weight:600;cursor:pointer;padding:10px 0}

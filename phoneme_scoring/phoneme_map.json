@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "model_id": "facebook/wav2vec2-xlsr-53-espeak-cv-ft",
+  "mfa_phone_set": "english_us_arpa",
+  "source": "https://huggingface.co/facebook/wav2vec2-xlsr-53-espeak-cv-ft/blob/main/vocab.json",
+  "notes": "Preliminary ARPA-to-eSpeak IPA mapping. Resolve labels using the loaded tokenizer get_vocab(), never guessed integer IDs. Original MFA labels and stress remain in output. Allophones and rhotics need human validation; this is not a calibrated pronunciation classifier.",
+  "silence": ["", "sil", "sp", "<eps>"],
+  "unsupported": ["spn", "unk", "<unk>", "noise", "laugh", "oov"],
+  "phones": {
+    "AA": "ɑː", "AE": "æ", "AH": "ʌ", "AO": "ɔː", "AW": "aʊ",
+    "AY": "aɪ", "B": "b", "CH": "tʃ", "D": "d", "DH": "ð",
+    "EH": "ɛ", "ER": "ɚ", "EY": "eɪ", "F": "f", "G": "ɡ",
+    "HH": "h", "IH": "ɪ", "IY": "iː", "JH": "dʒ", "K": "k",
+    "L": "l", "M": "m", "N": "n", "NG": "ŋ", "OW": "oʊ",
+    "OY": "ɔɪ", "P": "p", "R": "ɹ", "S": "s", "SH": "ʃ",
+    "T": "t", "TH": "θ", "UH": "ʊ", "UW": "uː", "V": "v",
+    "W": "w", "Y": "j", "Z": "z", "ZH": "ʒ"
+  },
+  "stress_overrides": {"AH0": "ə"},
+  "target_contrasts": [["TH", "T", "S", "F"], ["IH", "IY"], ["AE", "EH"]],
+  "unmapped_policy": "unsupported; raw_score null; never an error label"
+}

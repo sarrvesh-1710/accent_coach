@@ -1,0 +1,11 @@
+# Practice UI verification
+
+Fixed starting-step labels using Later and no-wrap status text with reduced padding. Kept status text at 14px. Visible scope statement is one sentence; How progress works contains the full explanation. Sentence is 32px with focus immediately below. Next-action wording is Practice next sentence, with Repeat [sound] practice only when no alternative exists.
+
+Renamed Profile section to Your latest sound checks. Current owner-scoped sound summaries now include latest_attempt_id, latest_recorded_at and latest_sentence from the actual contributing saved learner attempt. Dates are labeled Recorded because the available created timestamp is not an analysis completion timestamp. Each observed card links to its original recording/results in History. Unobserved sounds have no fabricated date or recording link. Deletion reverts to the next retained observation. No database migration or model work added.
+
+Browser layout evidence uses isolated HTML rendered by the actual route and scripts with sample responses, temporary accounts and no personal saved sessions or microphone access. Checked 900px visually; additionally measured 390, 768, 800 and 960px frames. Document scroll width equaled client width in those four measurements. All Next/Later labels occupied one line and fit their widths. Sentence computed font size was 32px. Preview stopped after verification. Screenshots and measurements: output/ui-responsive-preview/. This is not a live production acceptance test or physical-phone test.
+
+Regression evidence: see output/ui-final-regression-20261109.log for full final run. Focused coaching tests passed 8/8 including source identity, owner scope, date and deletion behavior; rendering wrapper passed all 34 scenarios. Existing controlled microphone checks cover timer, permission denial, capture cleanup and duration limits. Real microphone/network/model latency acceptance remains pending. No speed-setting, transcription, MFA or generation changes. No commit/push.
+
+Final full regression: 245 tests run in 91.601 seconds; 244 passed, one skipped. Existing Starlette/httpx deprecation and asyncio resource warnings appeared. Syntax and diff checks passed. Core speech files matched HEAD.

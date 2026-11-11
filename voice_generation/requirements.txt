@@ -1,0 +1,2 @@
+# Day 1 Windows desktop-voice backend uses Python standard library only.
+# No changes to the shared application's speech-model dependencies.

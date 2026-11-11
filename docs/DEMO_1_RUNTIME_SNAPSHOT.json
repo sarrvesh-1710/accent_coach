@@ -1,0 +1,31 @@
+{
+  "date": "2026-11-10",
+  "baseline_commit": "529e28e79fd996b228f8d8309a0642aee5caea6b",
+  "os": "Windows x64",
+  "app_python": "3.13",
+  "mfa_python": "3.11",
+  "mfa_version": "3.3.7",
+  "direct_packages_file": "requirements-demo-1.txt",
+  "mfa_execution": {
+    "reuse_process": true,
+    "idle_sec": 600,
+    "reuse_lexicon_graphs": true
+  },
+  "model_revisions": {
+    "phoneme": "2c733782da5604684829819a5eb744c193fe9398",
+    "transcription": "911407f4214e0e1d82085af863093ec0b66f9cd6"
+  },
+  "mfa_resources": {
+    "dictionary": {
+      "name": "english_us_arpa.dict",
+      "size_bytes": 7186498,
+      "sha256": "e8c6c7b036ae2b7c78d2768b8dc6b1f9359175b842956d00b48c53c9c332e6b0"
+    },
+    "acoustic": {
+      "name": "english_us_arpa.zip",
+      "size_bytes": 91928208,
+      "sha256": "d35ce271ded357d833d2f4b8d1041dc3748b9538567ba13f2c697f4e4126711b"
+    }
+  },
+  "note": "Observed laptop setup. Not a fresh installation or Azure validation. Personal paths, credentials, private accounts, recordings, weights and machine caches are excluded."
+}

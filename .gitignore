@@ -220,3 +220,15 @@ __marimo__/
 /data/
 /runs/
 /models/
+phoneme_scoring/settings.local.json
+phoneme_scoring/runs/
+phoneme_scoring/L2-ARCTIC/
+
+# Private account database, recording blobs, and temporary analysis files
+/private_data/
+
+# Local previews, screenshots, diagnostic exports and source backups
+/output/
+# Environment variants can contain provider or deployment credentials
+.env.*
+!.env.example

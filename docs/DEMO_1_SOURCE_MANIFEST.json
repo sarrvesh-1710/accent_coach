@@ -1,0 +1,961 @@
+{
+  "schema_version": 1,
+  "branch": "demo-1",
+  "date": "2026-11-10",
+  "baseline_commit": "529e28e79fd996b228f8d8309a0642aee5caea6b",
+  "note": "Hashes cover the shipped snapshot before this manifest and the later verification memo. UTF-8 text CRLF is normalized to LF; binary bytes are unchanged. No private runtime state is included.",
+  "files": {
+    ".gitignore": {
+      "sha256": "7c4d784dcef38e6a0542f3a0ceeb5939cf4b3641cf72f38875bf28cff50a8263",
+      "normalization": "utf8_lf"
+    },
+    "README.md": {
+      "sha256": "46ff535aa3af546911b3eff78f55a37eebb8b4665062d45abf149cfe4b575893",
+      "normalization": "utf8_lf"
+    },
+    "accent_profiles.py": {
+      "sha256": "265556afcbe600321020b5f43c92e5812ab4855096cbb96c46207fec675939fb",
+      "normalization": "utf8_lf"
+    },
+    "accent_profiles/chinese.json": {
+      "sha256": "55b7a8e4b9006a250fb88f12c3bfd22eec002a93df1c1f6767f1cfbc82e1781c",
+      "normalization": "utf8_lf"
+    },
+    "accounts/__init__.py": {
+      "sha256": "04d5711d4855b167336f205d21df082ab7b1e0aff46a2483750f1ba6527b73d4",
+      "normalization": "utf8_lf"
+    },
+    "accounts/background.py": {
+      "sha256": "5e446ad6b3a760f32dc2388f04f38c48989055fa4f245ab45bedd78ea5a9e030",
+      "normalization": "utf8_lf"
+    },
+    "accounts/coaching.py": {
+      "sha256": "cd0306b9969bb03d64df0ab406d737837a8a709f4db409f45f9faa2e6b36ff64",
+      "normalization": "utf8_lf"
+    },
+    "accounts/lesson_plan.py": {
+      "sha256": "8adbf8f8f3add97b6dff1152adc77c25549a48fd1f39f684615c86d8a445e1f5",
+      "normalization": "utf8_lf"
+    },
+    "accounts/practice_jobs.py": {
+      "sha256": "3353d6d5e6f4b084424cc03ca951773f8d9e1a2e498802ef5e3ed2ff254b5631",
+      "normalization": "utf8_lf"
+    },
+    "accounts/sessions.py": {
+      "sha256": "626b280097c15d486deadc5c80e3c0413999cff6c26f415f3323360c50201de0",
+      "normalization": "utf8_lf"
+    },
+    "accounts/store.py": {
+      "sha256": "3456cc23707dd8e7164266a559932a9b14d7f05d38ec78fbd731c01c9294bc0c",
+      "normalization": "utf8_lf"
+    },
+    "accounts/web.py": {
+      "sha256": "c1c62dcddf5c38278e0d0c7b840d56453f7a7f0f6493018739c3586796fe30cd",
+      "normalization": "utf8_lf"
+    },
+    "ai_coaching/__init__.py": {
+      "sha256": "42e5a42dd789772b8113d4c4c012974ce3ee2024232eb775205a0c34699d3bd4",
+      "normalization": "utf8_lf"
+    },
+    "ai_coaching/contract.py": {
+      "sha256": "857d1002426ce727470edbdebb9d3138be1c6ae11228020d5344de0471d13da1",
+      "normalization": "utf8_lf"
+    },
+    "ai_coaching/evidence.py": {
+      "sha256": "872b29e08febf7d638b13e5057efbecb9361f9265b32958f8769f8c755f81b98",
+      "normalization": "utf8_lf"
+    },
+    "ai_coaching/prompts/explain_v1.txt": {
+      "sha256": "752067b0bc9a5eef45a37dca9c640fcec8e833d989f61f29285e18687ccd9fd5",
+      "normalization": "utf8_lf"
+    },
+    "ai_coaching/provider.py": {
+      "sha256": "c9a0d5315bf3a1468d706df8cbfcbf9b0afb592e0d76f9c67784203df3b19d6d",
+      "normalization": "utf8_lf"
+    },
+    "ai_coaching/repository.py": {
+      "sha256": "e42c9da2c0caa57161b2ee1ae0ae4d7ad80f444e49b1b23008b970d1be8d9d14",
+      "normalization": "utf8_lf"
+    },
+    "ai_coaching/service.py": {
+      "sha256": "0950f30e5531ea1b230dbe789e59c6ad44442491227cc7369e73f391fbcdb540",
+      "normalization": "utf8_lf"
+    },
+    "analysis_service.py": {
+      "sha256": "d3060b36ff7c478bb8429135cf49adf5c5de6a7a5efd7f642b339470ca5204d4",
+      "normalization": "utf8_lf"
+    },
+    "app.py": {
+      "sha256": "818b04b96b6ff94492f948447ed4b3dd0d8ed4f1bb22c0f395eed996f6f53827",
+      "normalization": "utf8_lf"
+    },
+    "app_2.py": {
+      "sha256": "03ee2480229bb530bf37cfe26d14565ebd3120a7de69cf20318bb25f5cca7853",
+      "normalization": "utf8_lf"
+    },
+    "assessment.py": {
+      "sha256": "2b38bbf1eaa9dac2844514e234189da68ba74f68d15ffe88eec49a67dc953724",
+      "normalization": "utf8_lf"
+    },
+    "attempt_history.py": {
+      "sha256": "9f9bfa5399b89e2588899b7b73bd6dc0b925b9f204a8e0bd2317df8f4ebdcc92",
+      "normalization": "utf8_lf"
+    },
+    "audio_io.py": {
+      "sha256": "80f1647e440d06b44f0c8100f98032b0e9f5c7a950ce3890bc16d9c8a573a224",
+      "normalization": "utf8_lf"
+    },
+    "compare_audio.py": {
+      "sha256": "0b9baaf09a5a97aa138b1c93c9aa24f7db1296574f450b8d0c355aa6e516b29c",
+      "normalization": "utf8_lf"
+    },
+    "confirmed_analysis.py": {
+      "sha256": "d31612ce377087fbfce439e32589a24e5a6c0e92910c9d2ca7068f689d8f7e0e",
+      "normalization": "utf8_lf"
+    },
+    "contracts/evaluations/coaching_v1.json": {
+      "sha256": "ccad6a116d901a8022668d551284be8f73e40f8a1b955e82189944631fe1ed5d",
+      "normalization": "utf8_lf"
+    },
+    "contracts/examples/README.md": {
+      "sha256": "8d3b74fa70e4824e8bcaee78a3c719aa9e52b9b9739b5a6cf77013fa2fa739df",
+      "normalization": "utf8_lf"
+    },
+    "contracts/examples/job_accepted.json": {
+      "sha256": "783c359bf66305e173d760103f5dc7dc08f42ed793fafea8e2dda4786167b002",
+      "normalization": "utf8_lf"
+    },
+    "contracts/examples/job_failed.json": {
+      "sha256": "6610b078f1b3dc5bf4ec50634cb35153fb2fd1ba6393c286667f761ca1e8d25f",
+      "normalization": "utf8_lf"
+    },
+    "contracts/examples/session.json": {
+      "sha256": "80c653cc3a340b4d176dddbf34e6a093266543258be470968a85d8bf4bb73151",
+      "normalization": "utf8_lf"
+    },
+    "docs/ACCOUNTS_SETUP.md": {
+      "sha256": "4878959022fd2015c7c611d3241698a68307d4201c85e739a01f3003e445ce3f",
+      "normalization": "utf8_lf"
+    },
+    "docs/AI_COACHING_VERIFICATION_2026-11-10.md": {
+      "sha256": "a19bf8f1110a30dc68520543a227946670374c2a63e279259d1d22bbc806d627",
+      "normalization": "utf8_lf"
+    },
+    "docs/DAY_1_BENCHMARK.json": {
+      "sha256": "3912435de5e5601ea41d468327534ae6c6d0cc7870340fc1900e2224621f1deb",
+      "normalization": "utf8_lf"
+    },
+    "docs/DAY_1_ENGINEERING_REPORT.md": {
+      "sha256": "666dd623f9604e53bc46af119cac58f285e8156d6b26f24ccbaa6215d2dff294",
+      "normalization": "utf8_lf"
+    },
+    "docs/DAY_1_TEAM_HANDOFF.md": {
+      "sha256": "ed4c15c973226b739f41f6504bdf6089bf6770018e10d2b814a29092d86bc17a",
+      "normalization": "utf8_lf"
+    },
+    "docs/DAY_2_PHASE_2.md": {
+      "sha256": "341e2d981595109e5a0a6a5931d0e8067b74bce0f455e6949ec8f9e25a5ca370",
+      "normalization": "utf8_lf"
+    },
+    "docs/DAY_2_PHASE_3.md": {
+      "sha256": "1075f456c04e4703b0137b476e27242ef2b9b52f91810338b88c0b4c36599dee",
+      "normalization": "utf8_lf"
+    },
+    "docs/DAY_2_PHASE_4.md": {
+      "sha256": "4e55a77b96b763c894f836667bcd35d46687b2f65406f4410ca7f6dc4309c519",
+      "normalization": "utf8_lf"
+    },
+    "docs/DAY_2_PHASE_5.md": {
+      "sha256": "79623c1dfde5ff47d98b16d0b517838e758f5745b0479c8502bc5d69469f3034",
+      "normalization": "utf8_lf"
+    },
+    "docs/DAY_2_TEAM_HANDOFF.md": {
+      "sha256": "5c0b68446eba9fa8b78ea64e03f4886c55da32fe8d1003bc398adb7b94225726",
+      "normalization": "utf8_lf"
+    },
+    "docs/DAY_3_TEAM_HANDOFF.md": {
+      "sha256": "317868157f73756a8b50e8f42984b2c8c732b34f4780ecf4b29a7b758dfea71d",
+      "normalization": "utf8_lf"
+    },
+    "docs/DAY_4_DEMO_RUNBOOK.md": {
+      "sha256": "67a3b93e2d40e4f10b74b6f848742d5241b71d417b987f0472afbbced7361ad5",
+      "normalization": "utf8_lf"
+    },
+    "docs/DAY_4_MFA_INVESTIGATION.md": {
+      "sha256": "5177734b3f5761da221205803ab01dbef06fe17d7eb93e1f2014a2f596effc86",
+      "normalization": "utf8_lf"
+    },
+    "docs/DAY_4_PHASE_4_VERIFICATION.md": {
+      "sha256": "f00cdff897ccc37a97a489d85458402c3cd4a7234144fabb770bea0714b41473",
+      "normalization": "utf8_lf"
+    },
+    "docs/DAY_4_SPEED_HANDOFF.md": {
+      "sha256": "161c5a8d85f1e3eb94efb41c1c83e54742c6f64eb2b5c104c3a467a22eb50e82",
+      "normalization": "utf8_lf"
+    },
+    "docs/DAY_5_FRESH_RECORDING_TESTS.md": {
+      "sha256": "4e0d10224054f292831f1eb32b6ced91d72e053964fbc86fc89f3556f43ea101",
+      "normalization": "utf8_lf"
+    },
+    "docs/DAY_5_PHASE_4_PERFORMANCE.md": {
+      "sha256": "88d3dc59ab1b76ae5b8b200cc1ccafdb24434df889e95ae8a93987ee0e500e22",
+      "normalization": "utf8_lf"
+    },
+    "docs/DAY_5_TEAM_HANDOFF.md": {
+      "sha256": "c6c042892ad3c8014ad5fe45601cd647e1f440bd650fb95764a7fddb9e31dc9c",
+      "normalization": "utf8_lf"
+    },
+    "docs/DAY_6_BROWSER_ACCEPTANCE.md": {
+      "sha256": "0d05fda902c1f89a95616948d28314789338335ecdca4ff22aabdc1af16a3394",
+      "normalization": "utf8_lf"
+    },
+    "docs/DEMO_1_RUNTIME_SNAPSHOT.json": {
+      "sha256": "ff75cf95bbfa507948c2789866fb9913b1477a356978e8f7be9cef274b62551f",
+      "normalization": "utf8_lf"
+    },
+    "docs/DEMO_1_START_HERE.md": {
+      "sha256": "cb808de6747425d4eea5eec048eed7e601260f4cd83f044e458db85cf23d0b5a",
+      "normalization": "utf8_lf"
+    },
+    "docs/DEMO_FIXES_REPORT.md": {
+      "sha256": "8d024aa7f51986c5c035ee84284dd77c00de12cec1af7e374b361a843aa99b24",
+      "normalization": "utf8_lf"
+    },
+    "docs/DEMO_POLISH_2026-11-01.md": {
+      "sha256": "6e5771e7042a259dc9ee14d59b0030d94f71345a0789f7bf05772378713f28d0",
+      "normalization": "utf8_lf"
+    },
+    "docs/DEMO_RUNBOOK.md": {
+      "sha256": "2a982076a29c9e8703743d34be87143fd93133bd92e55d2745030efbcdd9d48c",
+      "normalization": "utf8_lf"
+    },
+    "docs/FILE_OWNERSHIP.md": {
+      "sha256": "4a3e151af168b1cc60d2b6b6eeb64b235f90c3fef1b5fbebc1cbf5c0206847f3",
+      "normalization": "utf8_lf"
+    },
+    "docs/FREE_SPEECH_DESIGN.md": {
+      "sha256": "dc85e1e461b0c2fd5a1c4baf986296164b7cf015888b1ad02cacf0bf0c4f26dd",
+      "normalization": "utf8_lf"
+    },
+    "docs/FRONTEND_REPORT_2026-10-11.md": {
+      "sha256": "fd5e9eeb6620ee7347c79a6a50512254d698583e3aa9d800db21376669692801",
+      "normalization": "utf8_lf"
+    },
+    "docs/GUIDED_PRACTICE_REVIEW_2026-11-09.md": {
+      "sha256": "dabc89fdbcba5e2483e2c97c8429cdb591400d96a3a46d371b13fc0f7afaafe0",
+      "normalization": "utf8_lf"
+    },
+    "docs/IMPLEMENTATION_REPORT_2026-10-10.md": {
+      "sha256": "c5968c07524168d5e9c043d0dfb3f04d8da18523ae2cbd347360661d49235475",
+      "normalization": "utf8_lf"
+    },
+    "docs/IMPLEMENTATION_REPORT_2026-10-11.md": {
+      "sha256": "c7986384abbb7320c6a162b2314635d6d7af30572543031e95b3f90671c13c99",
+      "normalization": "utf8_lf"
+    },
+    "docs/INTEGRATION_COMPLETION_REPORT.md": {
+      "sha256": "7e5e21a46ab41b0ec47f0f72c24dd531649e2a326cfd20d2e5df88843f4ff9b0",
+      "normalization": "utf8_lf"
+    },
+    "docs/INTERACTION_ACCEPTANCE_2026-11-09.md": {
+      "sha256": "f51ba4f377cb227ad3b474c0819893f59970562333b048cab5e57701e3bbdd11",
+      "normalization": "utf8_lf"
+    },
+    "docs/OPTIONAL_AI_COACHING.md": {
+      "sha256": "7e25c1300148f0bf3b8fb651299ab10c1692387304b6a42b1ec0ac7a74fcfcc9",
+      "normalization": "utf8_lf"
+    },
+    "docs/OPTIONAL_KOKORO_SETUP.md": {
+      "sha256": "3d2d5d3360303eeaaa7907e907b9ff99f0a23d48e7fceb5053269727b9f9116e",
+      "normalization": "utf8_lf"
+    },
+    "docs/PRACTICE_RESULTS_UPDATE_2026-10-27.md": {
+      "sha256": "49ec0499c7dd763c06c03e2764deb350fd22140b632e14f41884bf02afc40b6d",
+      "normalization": "utf8_lf"
+    },
+    "docs/PROGRESS_REPORT_2026-10-07.md": {
+      "sha256": "900a24b41e902bea49b83a43749d2c2815c22151a40e2b0c3f1385d6dc3a816e",
+      "normalization": "utf8_lf"
+    },
+    "docs/PUBLICATION_VERIFICATION_2026-11-02.md": {
+      "sha256": "11dcc5691bb33b0f51c17b56969a64db2abe1aa5de986b16b1d22e12a21488b4",
+      "normalization": "utf8_lf"
+    },
+    "docs/RAM_SPEED_RETEST_2026-11-03.md": {
+      "sha256": "f8430920f3b95048b2c989072c6803724828c0a08f0cba03b621a211fe995eef",
+      "normalization": "utf8_lf"
+    },
+    "docs/RESULT_AUDIO_RELIABILITY_2026-11-10.md": {
+      "sha256": "7060cc3c5d51393b26fe447e81b52970bfd8266d73b57adad54f85d6c8db2c3d",
+      "normalization": "utf8_lf"
+    },
+    "docs/RESULT_FEEDBACK_REVIEW_2026-11-10.md": {
+      "sha256": "1956639906dc5012a9b2df54cd98cafe39d665438e007437f7a7d0e2b7521960",
+      "normalization": "utf8_lf"
+    },
+    "docs/SELECTIVE_INTEGRATION_2026-11-09.md": {
+      "sha256": "0aca3493046cc184514ca1064a087a5f6d26516a8c2f3d0d8721fe5d22de62e9",
+      "normalization": "utf8_lf"
+    },
+    "docs/SPEED_COMPLETION_REPORT_2026-10-27.md": {
+      "sha256": "b072a83f399f6e61a3afd837b5f51b8324eb5c061e7b0f5449bddfeda409d269",
+      "normalization": "utf8_lf"
+    },
+    "docs/SPEED_DEMO_RUNBOOK_2026-10-27.md": {
+      "sha256": "14663d6c69f63566b3527a2dd90e03cf689df953b6448ed76f76b708f8a9da49",
+      "normalization": "utf8_lf"
+    },
+    "docs/SPEED_HANDOFF_2026-10-27.md": {
+      "sha256": "ec7f7879e7fa0e50e0a5421d9bef418fe107153a58ba1b3235135c3db5aa783c",
+      "normalization": "utf8_lf"
+    },
+    "docs/SPEED_INCIDENT_2026-11-02.md": {
+      "sha256": "1242a697a0b0668f16f26dbe382324c3b7f1a9b5eacd8338d4aba3e012e64527",
+      "normalization": "utf8_lf"
+    },
+    "docs/TEAM_BRANCH_INTEGRATION_REVIEW_2026-10-27.md": {
+      "sha256": "1823b2d8996741771baf14de077cf2c261b9089fe6dbc147e117a2afa64df84c",
+      "normalization": "utf8_lf"
+    },
+    "docs/TEAM_FEATURE_INTEGRATION_2026-10-28.md": {
+      "sha256": "3ca246cf8f898314aa326402f0000182d22501b1f326e0303986d4f6fcf2b657",
+      "normalization": "utf8_lf"
+    },
+    "docs/TEAM_INTERFACE.md": {
+      "sha256": "75c17eb6d868596f22c10631207bd01278807ba8cb2353ce276794d9da32c98c",
+      "normalization": "utf8_lf"
+    },
+    "docs/TEAM_START_HERE_2026-11-02.md": {
+      "sha256": "655cb66fa728eb0b4f0f9e3e0ad201adc7ea95632c5d13617921228982254363",
+      "normalization": "utf8_lf"
+    },
+    "docs/UI_FINAL_REFINEMENTS_2026-11-09.md": {
+      "sha256": "a7156fa2d8ceb67ecf9dd5db22182f7f2110395fe61f442ad1fd5e78e887156b",
+      "normalization": "utf8_lf"
+    },
+    "docs/UI_FLOW_POLISH_2026-11-09.md": {
+      "sha256": "862d37f2be999243fdfc7d890a7456653be6c5cb0db3ca43addee25b692f251e",
+      "normalization": "utf8_lf"
+    },
+    "docs/UI_HIERARCHY_REFINEMENT_2026-11-09.md": {
+      "sha256": "55602fd9d6a65fae538857dd1356186a412b992231341a40c4dce004d35c1a23",
+      "normalization": "utf8_lf"
+    },
+    "docs/UI_POLISH_2026-11-09.md": {
+      "sha256": "4dfc37be09836420617448bcdf154fa887331479536b77840ad97554e43922af",
+      "normalization": "utf8_lf"
+    },
+    "docs/UI_PRACTICE_VERIFICATION_2026-11-09.md": {
+      "sha256": "8e387d840936b88a7e0d5cb8920735dbfa452738a9106ec4e76978afb8e52a37",
+      "normalization": "utf8_lf"
+    },
+    "docs/UI_PRESENCE_UPDATE_2026-11-09.md": {
+      "sha256": "7de5f4d4376e2ff7b17e4e1ad062335fc67c61fe8239e3ead6209d1ed1fde69b",
+      "normalization": "utf8_lf"
+    },
+    "docs/UI_REFINEMENTS_2026-10-11.md": {
+      "sha256": "74019fb1e01f109055eebd0e6e49e7c02c26f575677353232fdf988add03b799",
+      "normalization": "utf8_lf"
+    },
+    "docs/UI_REVIEW_UPDATES_2026-11-09.md": {
+      "sha256": "d493c17625b837970d988d2760f146041755f2595597ae4d6ccf0e4f3aae9d50",
+      "normalization": "utf8_lf"
+    },
+    "docs/UI_UPDATE_REPORT_2026-10-10.md": {
+      "sha256": "27d75c67f93f22b4bec33c859531b444f4bace55764d01abd21e7cf18da63650",
+      "normalization": "utf8_lf"
+    },
+    "docs/VALIDATION_PROTOCOL.md": {
+      "sha256": "bc53edfc11c665b12525097d4aa79c752e6e93228bd83a744ef2e849df2e5548",
+      "normalization": "utf8_lf"
+    },
+    "docs/WEEK_ONE_PLAN.md": {
+      "sha256": "d7d21459796e70f60011434c34fb47b2268a3f9881b3ee890fe483581d3e7639",
+      "normalization": "utf8_lf"
+    },
+    "dsp_features.py": {
+      "sha256": "8e1d8deba3569070db71df5178626da1af4e4aadbad7e7c3e4c4a7cfbecf6d43",
+      "normalization": "utf8_lf"
+    },
+    "feedback.py": {
+      "sha256": "ea9e6e39aafa07443be57c90693f08f617e773ff19f54349ad521f5a90715df7",
+      "normalization": "utf8_lf"
+    },
+    "lesson_catalog.py": {
+      "sha256": "927ab20da6e701d7b92bbaa037948cc73cde9698e52da212d5237795a5530194",
+      "normalization": "utf8_lf"
+    },
+    "phoneme_scoring/align_audio.py": {
+      "sha256": "aa295422a673f29c2bdd4080c5ebf1187a90b79adf603f1100d4e457dfe7472a",
+      "normalization": "utf8_lf"
+    },
+    "phoneme_scoring/calibrate_scores.py": {
+      "sha256": "c5a0ad55625e779b982d6ba369994780c2bf792c4c0785f8e02ee7ff2874a25c",
+      "normalization": "utf8_lf"
+    },
+    "phoneme_scoring/calibration.py": {
+      "sha256": "46c431e1b2e9463808824fc596bdbaee5b1ea0db75ded8f5a427b940a923c763",
+      "normalization": "utf8_lf"
+    },
+    "phoneme_scoring/evaluate_speechocean.py": {
+      "sha256": "b398eef2b1e131f91a33f70d1c903b3c6fcdb772f64b6266ace91d2f9145cb13",
+      "normalization": "utf8_lf"
+    },
+    "phoneme_scoring/fst_resource_cache.py": {
+      "sha256": "0b03ad5faeec4e51eabfbb451b9c726fd6b6da7dc96796bd1d8788e9c735eb19",
+      "normalization": "utf8_lf"
+    },
+    "phoneme_scoring/gop_score.py": {
+      "sha256": "90f8092b4a83d86e0bfee83b7fd2334a99443ba395417bca925b5f435844f882",
+      "normalization": "utf8_lf"
+    },
+    "phoneme_scoring/mfa_dictionary_cache.py": {
+      "sha256": "40c917405a5079fe98b256bc3fc9029b077d45b8258ebc7bac2880d2d041368b",
+      "normalization": "utf8_lf"
+    },
+    "phoneme_scoring/mfa_worker.py": {
+      "sha256": "5ae31f92cf15f55a1b4bd54913428bfa490333fe328f03017502c177d869e217",
+      "normalization": "utf8_lf"
+    },
+    "phoneme_scoring/persistent_mfa.py": {
+      "sha256": "c76f60a13db797b6351537b6e322000f11dcf1376640cb8d6684f41eae0c4234",
+      "normalization": "utf8_lf"
+    },
+    "phoneme_scoring/phoneme_map.json": {
+      "sha256": "157804665c1a4d22237dc2f367656e939485d91b4ff2e65ffb77bc0bfcd3c35c",
+      "normalization": "utf8_lf"
+    },
+    "phoneme_scoring/process_lock.py": {
+      "sha256": "a6d3369e2d306cefec99aac4b853b930d8172bf335de6f8a43a4c84d1aef8d90",
+      "normalization": "utf8_lf"
+    },
+    "phoneme_scoring/read": {
+      "sha256": "15fd60c6f5c6804626177d178f3dba849a41f4a1878b2e7e7e3ed38a194dc82b",
+      "normalization": "utf8_lf"
+    },
+    "phoneme_scoring/result_1789999900850761800.json": {
+      "sha256": "d3db5ceac4e1ef85a2dc37944343943511571c2f4bcd4f457fab9f47417747e4",
+      "normalization": "utf8_lf"
+    },
+    "phoneme_scoring/sequence_evidence.py": {
+      "sha256": "655f2fa7cf624b3da1d527748d108f5d368138039cfcdc50fd83abce6b470f6d",
+      "normalization": "utf8_lf"
+    },
+    "phoneme_scoring/settings.json": {
+      "sha256": "59277e50070837ec093d2dbdf71bf60ec9e7d155af6238779f9d77131d263fda",
+      "normalization": "utf8_lf"
+    },
+    "phoneme_scoring/speechocean_data.py": {
+      "sha256": "5de8e12016135293a4d4e9e7903ca0fd1eff84db8266ccef22523c483706dc18",
+      "normalization": "utf8_lf"
+    },
+    "pipeline.py": {
+      "sha256": "8303f59363b10ed8cce5f37b40c4f28482955857abe2563b2de627637805b40c",
+      "normalization": "utf8_lf"
+    },
+    "practice_guides.py": {
+      "sha256": "b5e56b66921e0588714dd9577e739d0919dcf974e555d492e2e2d0ad76f03591",
+      "normalization": "utf8_lf"
+    },
+    "practice_targets.json": {
+      "sha256": "90e4856c7c9d449d33a24076d8ebe609f1741651f3eaa05ae6fe8a11c787dd4f",
+      "normalization": "utf8_lf"
+    },
+    "prompts.json": {
+      "sha256": "25d02e5781f83f59778f4443fac2ecf0a2597e9ff9169d6364135764c003c40c",
+      "normalization": "utf8_lf"
+    },
+    "requirements-accounts.txt": {
+      "sha256": "7242f4c13b1537b1d2a0a630d505f5b168f16d61cd4369f6c97071ec11045bdb",
+      "normalization": "utf8_lf"
+    },
+    "requirements-demo-1.txt": {
+      "sha256": "23f94bc881463ecdef806ef15a23d17f50c8bd1e4b93a8bed5bbe083a9a5776f",
+      "normalization": "utf8_lf"
+    },
+    "requirements-scoring.txt": {
+      "sha256": "2d9a7f1394862a0f8589899343deda7ec6ffc3329c4db2cd53a61ceb8543a68e",
+      "normalization": "utf8_lf"
+    },
+    "requirements.txt": {
+      "sha256": "b3a58fb0b64b1da8988f58cb7e68f412619cb5ddf94508744c0075b3c2cc9e0f",
+      "normalization": "utf8_lf"
+    },
+    "site_config.json": {
+      "sha256": "d6aaa4665dc2886b3586f6fc583d8785ec268c8fb007db623b44727ba34e771a",
+      "normalization": "utf8_lf"
+    },
+    "site_pages.py": {
+      "sha256": "31e7e26873c08bc5e338ef3ed2c2eadf0f114f0e173efd81b8c3816cef306b21",
+      "normalization": "utf8_lf"
+    },
+    "site_server.py": {
+      "sha256": "483ca5b965f849c63d6e3e464a8cc2aa20e8b1aede741b94cc3d8f280fcc1c99",
+      "normalization": "utf8_lf"
+    },
+    "speech_content.py": {
+      "sha256": "c79665bd46c565cd0a50a966bd89e009371112e5e95e8d960cdf8e3d6c62fa28",
+      "normalization": "utf8_lf"
+    },
+    "tests/fixtures/team/README.md": {
+      "sha256": "232952cfd5ef68892321b6376fc404f869871959dbc71582d0a14d89fe2c05f8",
+      "normalization": "utf8_lf"
+    },
+    "tests/fixtures/team/manifest.json": {
+      "sha256": "febee4b932b04ebc7b74138a88c5d0f0e94040d0ea3b3168c6aeb4e4980fdb7a",
+      "normalization": "utf8_lf"
+    },
+    "tests/fixtures/team/noise.wav": {
+      "sha256": "5d0d973e31ba1fc2b8c592ee9b7b34b834309642586808659cb4c658b736f7d4",
+      "normalization": "binary"
+    },
+    "tests/fixtures/team/silence.wav": {
+      "sha256": "20eaebffe1816e0ffa6f7f854f5ef4ea80d5349faaf0ce1fec1b713e7fde58fa",
+      "normalization": "binary"
+    },
+    "tests/profile_rendering.cjs": {
+      "sha256": "84a01a01fe7c41301b97b03749894d1f53da8f3b5502d6cfba39ef890a9744e2",
+      "normalization": "utf8_lf"
+    },
+    "tests/session_playback.cjs": {
+      "sha256": "b77fd33c2cf59d7a6c6bcffcf87b32c4ac548cbf42f85362050c38190d2b11db",
+      "normalization": "utf8_lf"
+    },
+    "tests/test_accounts_integration.py": {
+      "sha256": "d5bbe834d5538d04364186a9af967d3d1535bdf3eca1cdf02019202c01f3d364",
+      "normalization": "utf8_lf"
+    },
+    "tests/test_ai_coaching.py": {
+      "sha256": "fb31d22cd0e5c646b11474470c228029023797ad7db2f44b0c25d9bbb0b328f7",
+      "normalization": "utf8_lf"
+    },
+    "tests/test_app_2.py": {
+      "sha256": "9f478164ac9c4aab3eb35d310d1fa724565157b3c23e8727aeadfdc72d28ce89",
+      "normalization": "utf8_lf"
+    },
+    "tests/test_assessment.py": {
+      "sha256": "b0576562cf4ca8cca5cf0ded9e07466563edaebc983a34acd530d88d917d9ffd",
+      "normalization": "utf8_lf"
+    },
+    "tests/test_confirmed_analysis.py": {
+      "sha256": "c672e69d1131f8c1ab0f80755c855aa39f4091d3e2a2e56e2c7272330ad19950",
+      "normalization": "utf8_lf"
+    },
+    "tests/test_demo_mfa_setup.py": {
+      "sha256": "c43f42c15ca9b144cea0bec87f033a0835656066ce1b3ed553f8165e7486a308",
+      "normalization": "utf8_lf"
+    },
+    "tests/test_evidence_quality.py": {
+      "sha256": "e9e14ecdd1fc4ea6bb42f86d46fc16b823ac1b16322d1bbcc41e6520418918bd",
+      "normalization": "utf8_lf"
+    },
+    "tests/test_example_http.py": {
+      "sha256": "b6af6c55ec92d9327d0f3839bc9869d7a783eb7dc4b8afa6f001ef4f398309bb",
+      "normalization": "utf8_lf"
+    },
+    "tests/test_example_service.py": {
+      "sha256": "51a41c859cbdcd4cecdd4c9589cc0a41a53bee0b6789730b5728aff14faeee18",
+      "normalization": "utf8_lf"
+    },
+    "tests/test_fst_resource_cache.py": {
+      "sha256": "2e1a10dd8285813ca2e5287eb6237cb887e8414093043e07162571a98671860a",
+      "normalization": "utf8_lf"
+    },
+    "tests/test_generation_runtime.py": {
+      "sha256": "dd00cf9cb0e15b94f72f89b1feb39d1c749b901f9b9668eb532778c8b605e751",
+      "normalization": "utf8_lf"
+    },
+    "tests/test_information_headers.py": {
+      "sha256": "827241549858e8d7efa1087162d952f33f2c8e2b5b7a5083828a071cb48eb655",
+      "normalization": "utf8_lf"
+    },
+    "tests/test_kokoro_generation.py": {
+      "sha256": "832033fa37c3146d57b51b57795839bab3e7d961087ec3340444c3bfc79d96f3",
+      "normalization": "utf8_lf"
+    },
+    "tests/test_lesson_plan.py": {
+      "sha256": "e8360b454d8c37eaf1c5996dd6f38f5c231b9726f49a4dfb1796e0222efbd85f",
+      "normalization": "utf8_lf"
+    },
+    "tests/test_mandarin_research.py": {
+      "sha256": "d594291f7d19800fe690bb729a289c96c60ffd838c3d6d58614dbc07e58f930d",
+      "normalization": "utf8_lf"
+    },
+    "tests/test_mfa_dictionary_cache.py": {
+      "sha256": "322a3d5191a99deb0e4344fa6e9993025a1442d3af95c222b230535b34e2ea93",
+      "normalization": "utf8_lf"
+    },
+    "tests/test_mfa_timings.py": {
+      "sha256": "5e37d88035a009a65146f53ef98195289d2b6246c868c3587c7b6943df76ee4f",
+      "normalization": "utf8_lf"
+    },
+    "tests/test_microphone.cjs": {
+      "sha256": "872a4b264d5b90f3b184e0f499c7c434be936a2ed09dda19f65544bdff5d17bb",
+      "normalization": "utf8_lf"
+    },
+    "tests/test_microphone.py": {
+      "sha256": "34d4aa990dc9d43e4dc0af75d36797a4825ea5808dffd1af9a465ae6d63334e1",
+      "normalization": "utf8_lf"
+    },
+    "tests/test_persistent_mfa.py": {
+      "sha256": "097bd16f9b30eee8b275c7a536b7c4fcf2744851a393ee3773d29536ebee1bd2",
+      "normalization": "utf8_lf"
+    },
+    "tests/test_pipeline.py": {
+      "sha256": "d5872eabaa7769d5c88c99fca6d5dac5a4af69bca91be0d7c8e1ebdca156e494",
+      "normalization": "utf8_lf"
+    },
+    "tests/test_practice_sessions.py": {
+      "sha256": "7f7a2c6add8812159ae82a7aa3ab0443400a7c8d19171da488e2b98fe5b5c813",
+      "normalization": "utf8_lf"
+    },
+    "tests/test_profile_coaching.py": {
+      "sha256": "4502b4a252aaeda5caa9e521df97f4fb93ee307c9ac778de509e459ae0686f2e",
+      "normalization": "utf8_lf"
+    },
+    "tests/test_profile_preferences.py": {
+      "sha256": "afade6d446db33ef49703e364f6bd90f6d5d9424235496359de5837807544eb3",
+      "normalization": "utf8_lf"
+    },
+    "tests/test_profile_rendering.py": {
+      "sha256": "dd0c48215bf43a0f653415cda5e074527f9bf7562ee21c208be7fad4a31289a6",
+      "normalization": "utf8_lf"
+    },
+    "tests/test_reference_free.py": {
+      "sha256": "37cd6777ffc5aa50c474e27dc5986fab67a7cdb423d823514c4fcba980f4714e",
+      "normalization": "utf8_lf"
+    },
+    "tests/test_release_features.py": {
+      "sha256": "dd2c7eb18ad8d0027905917661127244c1c77a5f010567cba5cd867cd322ec13",
+      "normalization": "utf8_lf"
+    },
+    "tests/test_session_playback.py": {
+      "sha256": "b6c62cba0f0fd6a24afdc6ff64717f59f829cd77abf51269efbb06cb24832de2",
+      "normalization": "utf8_lf"
+    },
+    "tests/test_site.py": {
+      "sha256": "2f37f532835baae62f3a70cb80d9f4f896c4089a0ea22ad104bc05e56d596e08",
+      "normalization": "utf8_lf"
+    },
+    "tests/test_team_additions.py": {
+      "sha256": "42953aeb70684ac2c6f614b780ce9b7689417669f09c9a4f30f95d70d75e6f9b",
+      "normalization": "utf8_lf"
+    },
+    "tests/test_transcript_input.py": {
+      "sha256": "b734ca98ae0dbe6ac7d4282fe7650999b33e240fc962a2d9a7236c3d21bea522",
+      "normalization": "utf8_lf"
+    },
+    "tests/test_transcription.py": {
+      "sha256": "05c19c555676f575d1b74739812c62f34c052e7a224cb9c37d938154d72c117d",
+      "normalization": "utf8_lf"
+    },
+    "tests/test_voice_generation.py": {
+      "sha256": "51df683a7e59d5fdc01ea83fcb67a91ee45d4ee3aa4193927947fec299e178ac",
+      "normalization": "utf8_lf"
+    },
+    "tools/audit_pronunciations.py": {
+      "sha256": "3a847f5aff8e6754d09d1d7f90aa3e5de377ebd9ae37042150fde40a0c613d8b",
+      "normalization": "utf8_lf"
+    },
+    "tools/benchmark_mfa.py": {
+      "sha256": "228a4afdc0409eaa46b6274cf0ef455a0f7f6632a1ea401dc336bb64095cc047",
+      "normalization": "utf8_lf"
+    },
+    "tools/benchmark_optional_coaching.py": {
+      "sha256": "c3eb65adce22648be0d111d2cf23657e1f6eb253ef73e1009a3e4d38bfacec91",
+      "normalization": "utf8_lf"
+    },
+    "tools/benchmark_pipeline.py": {
+      "sha256": "b97284a87c144463eed9d1e87b9b48b50ea47212d64afb19392ef5b3bac61353",
+      "normalization": "utf8_lf"
+    },
+    "tools/build_practice_examples.ps1": {
+      "sha256": "784af7cc8f7776a8329b5b00105d8ee63d9019a80bb72281febacc4b30cda78f",
+      "normalization": "utf8_lf"
+    },
+    "tools/check_assessment.py": {
+      "sha256": "4347aec2b78451de78b3acd05fd1fd37ea5f9ab508aeefa3dc52a94578e7ceec",
+      "normalization": "utf8_lf"
+    },
+    "tools/check_audio_failures.py": {
+      "sha256": "b8f0ebb32d128b8e8848d5b66b5c9705c94c06ada0f607f52d762afca5959125",
+      "normalization": "utf8_lf"
+    },
+    "tools/check_installation.py": {
+      "sha256": "10d9752b8b7ff7c664bb18e4d4a84b90da127307fac9b6e6ce8287fdec6863e1",
+      "normalization": "utf8_lf"
+    },
+    "tools/check_private_free_speech.py": {
+      "sha256": "e393844588b359ec6faea1e8f9fa98282eb170c857c5f2b149ed924fba0d7062",
+      "normalization": "utf8_lf"
+    },
+    "tools/check_reference_free.py": {
+      "sha256": "2e6a67deab3de66547786ce021301791c9e54eaeaea92971fcc70335ad2dca1d",
+      "normalization": "utf8_lf"
+    },
+    "tools/check_release.py": {
+      "sha256": "66adc32624206dd435247fe5b7c4ec6233630d40e5bb1089281415830a829fd6",
+      "normalization": "utf8_lf"
+    },
+    "tools/check_site_readiness.py": {
+      "sha256": "7e8a465f5c06649b621c23bf362a8d5c33dabb654c73b492142ef63c2d35e5a7",
+      "normalization": "utf8_lf"
+    },
+    "tools/check_team_fixtures.py": {
+      "sha256": "3b78948e2f0ae5fc0c18b3ba15171c64f419f19236b56d2dda57f34e6f6b91b2",
+      "normalization": "utf8_lf"
+    },
+    "tools/compare_mfa_launch.py": {
+      "sha256": "73a0ffeae238153434d452b9a94dffd66a8fca48bae6fc9bf3ed3b94ad782b15",
+      "normalization": "utf8_lf"
+    },
+    "tools/configure_demo_mfa.py": {
+      "sha256": "2ba952f561525362e3ad503f9a4fde0b10060423ad7cb2dda52047cffebfbd81",
+      "normalization": "utf8_lf"
+    },
+    "tools/evaluate_recordings.py": {
+      "sha256": "231c31679e2c2ad3232a9e6e6627da089247e3c89b1dc9cebed94aa265045b3c",
+      "normalization": "utf8_lf"
+    },
+    "tools/export_alignment_review.py": {
+      "sha256": "494002a923ceab1d3002080e81a709be369044acd76e2827d4c414c8f321b60b",
+      "normalization": "utf8_lf"
+    },
+    "tools/release_snapshot.py": {
+      "sha256": "111fa998d0e56a132f978c72964ed7444ec17e8d9ceeaad00e4717155a9f629d",
+      "normalization": "utf8_lf"
+    },
+    "tools/setup_content_model.py": {
+      "sha256": "ece9c9e4274631936dcc501d33bd579677ccac9e34ff5b4bffb7946f1f297812",
+      "normalization": "utf8_lf"
+    },
+    "tools/setup_models.py": {
+      "sha256": "879421117e298ae9ec1934313bc33c909c740656c17f86f765b48bdae8a02cbb",
+      "normalization": "utf8_lf"
+    },
+    "tools/verify_day2_smoke.py": {
+      "sha256": "90fa9ef323b1eaca5aa3e96b7b5fd1d4e469854dd1fc7207cb47b2a5420dac7e",
+      "normalization": "utf8_lf"
+    },
+    "transcript_input.py": {
+      "sha256": "f8f9f1dcfd30de73be004e09db6687876f114bfff04338db1cf260a8d0e5823d",
+      "normalization": "utf8_lf"
+    },
+    "voice_generation/DAY2_RUNBOOK.md": {
+      "sha256": "962dc3d448ecd344e3e614f0619da71a2deb33c96a2eb59444ccd46685e91794",
+      "normalization": "utf8_lf"
+    },
+    "voice_generation/DELIVERABLES.md": {
+      "sha256": "a490b06bba57992d76e2c9d4576240ed1d12bdb7d27c85dd2680f7f11a5a4614",
+      "normalization": "utf8_lf"
+    },
+    "voice_generation/FEASIBILITY.md": {
+      "sha256": "3e4e2b11bc828d20c07ba216de5eb1c565dbd225702f2ec50988a7b6a805c983",
+      "normalization": "utf8_lf"
+    },
+    "voice_generation/KOKORO_RUNBOOK.md": {
+      "sha256": "7854e2704eded0acc7c872df5a285ee8792d361fb413a0c2f302b3167c91c44a",
+      "normalization": "utf8_lf"
+    },
+    "voice_generation/README.md": {
+      "sha256": "5519bd93ec86f375add2bbf6973e2a19b986d2647695b800d8f5a800a0490ce6",
+      "normalization": "utf8_lf"
+    },
+    "voice_generation/__init__.py": {
+      "sha256": "27b1c728f16c58fba12198aad4d1c48b72af96654841001a8e145993ecb160e9",
+      "normalization": "utf8_lf"
+    },
+    "voice_generation/__main__.py": {
+      "sha256": "9c32b03e5d89779d7b791a9135f9e5fd99395d4c3a8bb3e9c784b3cc654bd57c",
+      "normalization": "utf8_lf"
+    },
+    "voice_generation/benchmark.py": {
+      "sha256": "619f010b5e78d2c7fba0e9e029471bcd4e5ff74bfccefbcb809f1bc9dc7c8862",
+      "normalization": "utf8_lf"
+    },
+    "voice_generation/compare_voices.py": {
+      "sha256": "ee8ff113b4ab248af330240674bcfed215383f749bf70dc0fd719d1a6467c25f",
+      "normalization": "utf8_lf"
+    },
+    "voice_generation/demo.py": {
+      "sha256": "8037c4998893e873fe1828e2d7894e1618cf716517b3787438bf6f90fd41ce8c",
+      "normalization": "utf8_lf"
+    },
+    "voice_generation/examples/README.md": {
+      "sha256": "820b00c8fa87ffde506ab5bccf841c1420c8bb9592695f427d07c12a7d1be634",
+      "normalization": "utf8_lf"
+    },
+    "voice_generation/examples/generation_accepted.json": {
+      "sha256": "1e6db2cfb9102ac25694f5af5efb6615638eda9a937832c0b642d545f16c5a29",
+      "normalization": "utf8_lf"
+    },
+    "voice_generation/examples/generation_failed.json": {
+      "sha256": "b37c7ee56e6b7b5f90b73d17d4818eb8e5c299ebe85f53c70de03ec3eb11f2ea",
+      "normalization": "utf8_lf"
+    },
+    "voice_generation/external_worker.py": {
+      "sha256": "c21ea540cde8a99fa0429e05a0254b61b37267c4055c3fb64e0a8890c6cd6153",
+      "normalization": "utf8_lf"
+    },
+    "voice_generation/generator.py": {
+      "sha256": "a9d7eeb3b206565f485361b96599ef45a6444a529a5387c7eccb58d9ce85cbf8",
+      "normalization": "utf8_lf"
+    },
+    "voice_generation/kokoro_backend.py": {
+      "sha256": "f80cdd17e108c74612c9ab927cbe7b0291ff0ca6d9b65ae1ffd882e873185edf",
+      "normalization": "utf8_lf"
+    },
+    "voice_generation/panel/index.html": {
+      "sha256": "a27945dab21e49b6f4bd53f6a45dc73ff78bbd67889dc51d06b9d375b785b459",
+      "normalization": "utf8_lf"
+    },
+    "voice_generation/panel/panel.css": {
+      "sha256": "f93822c1096f03021470597d98d16284b58e11fbdeb7360b9b3dbaa11f45845e",
+      "normalization": "utf8_lf"
+    },
+    "voice_generation/panel/panel.js": {
+      "sha256": "051edef3181f6607649f20c3c763dbfbc5799e13d1bae0a37e833f93b3f86268",
+      "normalization": "utf8_lf"
+    },
+    "voice_generation/requirements-kokoro-lock.txt": {
+      "sha256": "fda3d12e8c25c4801969681799d166c66eadde004dde571148ea3e42b9eaf795",
+      "normalization": "utf8_lf"
+    },
+    "voice_generation/requirements-kokoro.txt": {
+      "sha256": "8084d1f9b1084cd6d567cc2f45c122822b799c11732f07ee2f7b0f9af225dcd0",
+      "normalization": "utf8_lf"
+    },
+    "voice_generation/requirements.txt": {
+      "sha256": "26b888906652da10288638d6a91642fd10c2d4fd6b48ec705d39b497ee02baa3",
+      "normalization": "utf8_lf"
+    },
+    "voice_generation/runtime.py": {
+      "sha256": "0588ec539a26c9e822b4cb3b40eada487724659b81696a02b363cf69ef5bad3b",
+      "normalization": "utf8_lf"
+    },
+    "voice_generation/service.py": {
+      "sha256": "549e916994fbe45f8f6b0633a02d77912a4ebb36bd839c320d60547d474d66d9",
+      "normalization": "utf8_lf"
+    },
+    "voice_generation/setup_kokoro.py": {
+      "sha256": "6e470f66307efaeb0202a403e51bea123063ed49c0b41b6001a00543745e1b6b",
+      "normalization": "utf8_lf"
+    },
+    "voice_generation/synthesize.ps1": {
+      "sha256": "67580a71e5702c5ff54aee423e26944227b49655ecfcd27d06c49a986d44139d",
+      "normalization": "utf8_lf"
+    },
+    "voice_generation/worker.py": {
+      "sha256": "e5e7e448c5501bd91d88440d2a614c06f484ec53e61e7b3a2fdf0b48ebf92d50",
+      "normalization": "utf8_lf"
+    },
+    "web_assets/accounts.css": {
+      "sha256": "05f29cb4b086deaacf6cf51c697743aab07b912e12e63b00ee77e5df02433ef7",
+      "normalization": "utf8_lf"
+    },
+    "web_assets/accounts.js": {
+      "sha256": "82355ccfdfe0cf716cff8a42db0be285ba6241649dff71833bbd78212052102f",
+      "normalization": "utf8_lf"
+    },
+    "web_assets/coaching.js": {
+      "sha256": "e3063374fc2468fb07e5c67bc11532e29c6ae5b28b7a7a6aae8a2e0de5c4da8b",
+      "normalization": "utf8_lf"
+    },
+    "web_assets/examples/bad_bed.wav": {
+      "sha256": "7be8322e9d4cac6fef550f9e26ecc696e30e7ccfb9801095fa36947107618fa2",
+      "normalization": "binary"
+    },
+    "web_assets/examples/bad_day.wav": {
+      "sha256": "19cedfb0d378cc69a2c04a10ef18d0ec376e12182628a8a461383c0d6a64fbc8",
+      "normalization": "binary"
+    },
+    "web_assets/examples/bad_idea.wav": {
+      "sha256": "46560aadef252b31d1113931f2ae54fcb51411a3ed5353bce0efcd7063b4b8c3",
+      "normalization": "binary"
+    },
+    "web_assets/examples/bad_plan.wav": {
+      "sha256": "5c0890a013f3bc0fd7c9e3fb4b7e9ae2512601efec0a8760f3409ff221f1cf13",
+      "normalization": "binary"
+    },
+    "web_assets/examples/manifest.json": {
+      "sha256": "18babc8c2084bb9b7886986ac9714fda558a75a158a81ec9907daefd007adf00",
+      "normalization": "utf8_lf"
+    },
+    "web_assets/examples/ship.wav": {
+      "sha256": "7b7298cec708233182ef9eda612b514335725521b4a2fb496891dbfae394d81a",
+      "normalization": "binary"
+    },
+    "web_assets/examples/ship_big.wav": {
+      "sha256": "fa36cb31fb244b4ba0837975b00f04938be2f104ac7a1bd8627cdd94219b2769",
+      "normalization": "binary"
+    },
+    "web_assets/examples/ship_coming.wav": {
+      "sha256": "f61e3a610f4573c570f05c101a2b85651b5626010794b00ef4a5a4500f3e912a",
+      "normalization": "binary"
+    },
+    "web_assets/examples/ship_see.wav": {
+      "sha256": "536f99b4611f61d772f4dda5f860415a216121db3d68beb6a53ce85bb7002c74",
+      "normalization": "binary"
+    },
+    "web_assets/examples/think.wav": {
+      "sha256": "6ff1f621dcddfe25685708e0194884d1f918e9e5341188d31ca254d0a3eb0a0c",
+      "normalization": "binary"
+    },
+    "web_assets/examples/think_again.wav": {
+      "sha256": "e4e967aea34963b11b0c66ee53b66bfc2351b6f24a7c3082368a67a075f2bd73",
+      "normalization": "binary"
+    },
+    "web_assets/examples/think_can.wav": {
+      "sha256": "56f8fd350569040edf6a92cabf7eb733f064941c34c2d21f568839f34585464d",
+      "normalization": "binary"
+    },
+    "web_assets/examples/think_fine.wav": {
+      "sha256": "4fe248f736c092fff740abf1a8ebdbb06c4bfd5b5f5d99ca5cf0027bdeb91a7a",
+      "normalization": "binary"
+    },
+    "web_assets/favicon.ico": {
+      "sha256": "d28e683097b23bd2906171ea07d6722f344f46189d82230674d3da23d2b7db53",
+      "normalization": "binary"
+    },
+    "web_assets/favicon.svg": {
+      "sha256": "433fea455e22a63c78c03e22a684efb026059a0f6a0dd87186c14baa6befa315",
+      "normalization": "utf8_lf"
+    },
+    "web_assets/lesson_plan.js": {
+      "sha256": "40b1472ba1b8f3445c156964be1e545b0c0c0c5947e1b4c39d8d9d17194f3bca",
+      "normalization": "utf8_lf"
+    },
+    "web_assets/microphone.js": {
+      "sha256": "8bb7dfe01a9a3b0fade2978fd095864ab464ade6914766fce8e6fe54b92d5231",
+      "normalization": "utf8_lf"
+    },
+    "web_assets/microphone.svg": {
+      "sha256": "caa2fb8fb0c61e45d5cf2135bcc9c03e8d3502dd283166b1018ab0b373fe45e6",
+      "normalization": "utf8_lf"
+    },
+    "web_assets/practice.js": {
+      "sha256": "a7e16f550d37fef7f3cf018064fe066f039d9fe7c48d8c066b888bb9d2662648",
+      "normalization": "utf8_lf"
+    },
+    "web_assets/profile.css": {
+      "sha256": "2d3918e640fb33e2e7967ec060fe762c8cfccc3b41c8ffec7be39f70d0465eb7",
+      "normalization": "utf8_lf"
+    },
+    "web_assets/profile.js": {
+      "sha256": "44183139c93a417588b44109a24bec12cbb05a1a9727458b4c6e4be50350bbfb",
+      "normalization": "utf8_lf"
+    },
+    "web_assets/result_coach.js": {
+      "sha256": "14b3b99b0f9e9a92e61b00f759b02c3ba0acf6ad98598dabf5a86b3b6fdbc1e3",
+      "normalization": "utf8_lf"
+    },
+    "web_assets/site.css": {
+      "sha256": "3b30ffbb19ec982b6d1351c8abef7b28198cacb3526d39921de1ec4eab9cbc83",
+      "normalization": "utf8_lf"
+    },
+    "web_assets/ui-polish.css": {
+      "sha256": "28afb6ebb2d33605c66c1f25dfc528dd88a6f581bbd1c66bffd8f907bbead4ee",
+      "normalization": "utf8_lf"
+    }
+  }
+}

@@ -1,0 +1,22 @@
+# Observed laptop app versions: Windows Python 3.13, November 10, 2026.
+# Matches the installed direct packages used for the recorded tests.
+# This is not a claim that a fresh install or Linux port has been verified.
+# MFA has a separate Python 3.11 Conda environment; Kokoro is optional/separate.
+--extra-index-url https://download.pytorch.org/whl/cpu
+numpy==2.2.6
+scipy==1.15.3
+soundfile==0.13.1
+librosa==0.11.0
+praat-parselmouth==0.4.7
+gradio==6.28.0
+torch==2.14.0+cpu
+transformers==5.17.0
+huggingface-hub==1.33.0
+phonemizer==3.4.0
+argon2-cffi==25.1.0
+argon2-cffi-bindings==26.1.0
+fastapi==0.141.1
+uvicorn==0.53.0
+httpx==0.28.1
+pydantic==2.13.5
+python-multipart==0.0.32

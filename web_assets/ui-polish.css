@@ -193,3 +193,62 @@ button:focus-visible, a:focus-visible, summary:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   button, .account-card a.button { transition: none; }
 }
+
+/* Practice workspace: the sentence and recording action lead the page. */
+.practice-intro { max-width: 820px; padding: 12px 0 32px; }
+.practice-intro .brand-wave { display: none; }
+.practice-intro h1 { font-size: clamp(32px, 4vw, 50px); line-height: 1.12; letter-spacing: -1.8px; margin-bottom: 16px; }
+.practice-intro > p:not(.eyebrow) { font-size: 17px; line-height: 1.65; max-width: 600px; }
+.practice-intro .practice-limits { gap: 8px 18px; margin-top: 20px; color: var(--muted); font-size: 13px; font-weight: 400; }
+.practice-limits span + span { padding-left: 18px; border-color: #c8d5df; }
+.practice-layout { grid-template-columns: minmax(0, 1fr) 310px; gap: 24px; }
+.practice-main > .account-card { padding: 28px; margin-bottom: 20px; }
+.recording-workspace { border-top: 3px solid #126a67; }
+.recording-workspace .practice-settings { margin-top: 4px !important; border-color: var(--line); }
+.recording-workspace .practice-settings > summary { color: #3a5361; font-size: 14px; }
+.recording-workspace select { background: #f8fafc; border-color: #d2dde5; font-weight: 500; }
+.recording-workspace label { color: #38505f; }
+.speaking-exercise {
+  padding: 24px;
+  margin: 24px 0 16px;
+  border: 1px solid #dfebe9;
+  border-radius: 12px;
+  background: #f3f9f7;
+}
+.speaking-exercise .practice-sentence { font-size: clamp(26px, 3.2vw, 38px); color: #173d3d; line-height: 1.3; letter-spacing: -1px; }
+.speaking-exercise .practice-focus { color: #3d6865; }
+.speaking-exercise .listening-example { background: transparent; border-top: 1px solid #d8e7e3; border-radius: 0; padding: 16px 0 0; margin: 20px 0 0; }
+.listening-example > summary { font-size: 14px; font-weight: 600; color: #215d59; min-height: 36px; cursor: pointer; }
+.speaking-exercise .record-actions { margin: 24px 0 0; gap: 10px; }
+.record-actions .record-button { min-height: 48px; padding: 12px 20px; margin: 0; }
+.record-actions #stop { min-height: 48px; margin: 0; background: #fff3f2; color: #a33035; border-color: #e5b3b3; }
+.recording-workspace[data-ui-state=recording] .speaking-exercise { border-color: #d59b9e; background: #fff8f7; }
+.recording-workspace .upload-option { border-color: var(--line); font-size: 14px; }
+.recording-workspace #practice-status { font-size: 14px; }
+.practice-sidebar .plan-card { padding: 24px; background: #eef3f6; border-color: #dce5eb; box-shadow: none; }
+.practice-sidebar .plan-card h2 { font-size: 21px; }
+.plan-card progress { accent-color: #126a67; height: 7px; }
+.plan-card button, .plan-card a.button { font-size: 14px; }
+.practice-main > .guide-card { padding: 18px 24px; box-shadow: none; }
+.guide-card > summary { min-height: 28px; color: #355566; font-size: 14px; font-weight: 600; cursor: pointer; }
+.result-header { padding-bottom: 16px; border-bottom: 1px solid var(--line); margin-bottom: 20px; }
+.sound-result-card, .result-notice { border-radius: 10px; border-left-width: 3px; padding: 18px 20px; }
+.sound-result-card[data-outcome=supported] { background: #eff8f4; border-color: #2b8b71; }
+.sound-result-card[data-outcome=practice] { background: #fff8e9; border-color: #ac741c; }
+.result-word-comparison { border-radius: 10px; background: #f3f6f9; }
+.account-card .form-error, .account-card .danger { color: #a12e3a; }
+.account-card .result-qualification { color: #596b79; }
+
+@media (max-width: 900px) {
+  .practice-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .practice-sidebar { order: 2; }
+}
+@media (max-width: 540px) {
+  .practice-intro { padding-bottom: 24px; }
+  .practice-main > .account-card, .practice-sidebar .plan-card { padding: 20px; }
+  .speaking-exercise { padding: 18px; margin-top: 20px; }
+  .speaking-exercise .practice-sentence { font-size: 28px; }
+  .practice-intro .practice-limits { gap: 6px 12px; }
+  .practice-limits span + span { padding-left: 12px; }
+  .record-actions .record-button { width: 100%; justify-content: center; }
+}

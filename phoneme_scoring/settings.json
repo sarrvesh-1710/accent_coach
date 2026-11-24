@@ -16,7 +16,12 @@
     "phone_tiers": [
       "phones"
     ],
-    "timeout_sec": 120
+    "timeout_sec": 120,
+    "dictionary_cache_directory": "../runs/mfa-dictionary-cache"
+  },
+  "mfa_execution": {
+    "reuse_process": true,
+    "idle_sec": 600
   },
   "dsp": {
     "min_duration_sec": 0.1,

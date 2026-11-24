@@ -15,6 +15,7 @@ class DictionaryCacheTests(unittest.TestCase):
         env = self.root / 'env'
         (env / 'Scripts').mkdir(parents=True)
         (env / 'Scripts/mfa.exe').write_bytes(b'fixture-executable')
+        (env / 'python.exe').write_bytes(b'fixture-interpreter')
         (env / 'conda-meta').mkdir()
         self.metadata = env / 'conda-meta/montreal-forced-aligner-3.3.7-test.json'
         self.metadata.write_text(json.dumps({'version': '3.3.7'}))

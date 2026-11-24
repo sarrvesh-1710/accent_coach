@@ -1,7 +1,7 @@
 """Opt-in reuse of an owned MFA interpreter; never cache learner results.
 
 The caller retains the existing cross-process MFA lock for the entire call.
-Only the inspected direct Windows MFA 3.3.7 installation is supported. Each
+Supported launchers are validated against their Conda package metadata. Each
 request still invokes the installed CLI with its original per-recording args.
 """
 import atexit
@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import queue
+import signal
 import subprocess
 import threading
 import time
@@ -20,15 +21,27 @@ class UnsupportedRuntime(ValueError):
     """Raised before alignment starts; caller may use the ordinary CLI."""
 
 
+def install_prefix(command):
+    exe = Path(command[0]) if command else None
+    if exe and len(command) == 1 and exe.name.lower() == 'mfa.exe':
+        return exe.resolve().parent.parent
+    if exe and exe.is_absolute() and exe.name.lower() == 'python.exe' and command[1:] == ['-m', 'montreal_forced_aligner']:
+        return exe.parent
+    if (exe and exe.name == 'micromamba' and len(command) == 5
+            and command[1:3] == ['run', '-p'] and command[4] == 'mfa'
+            and Path(command[3]).is_absolute()):
+        return Path(command[3])
+    raise UnsupportedRuntime('Unsupported MFA launcher')
+
+
 def runtime(command):
-    if len(command)!=1 or Path(command[0]).name.lower()!='mfa.exe':
-        raise UnsupportedRuntime('Reusable MFA requires a direct Windows install')
-    prefix=Path(command[0]).resolve().parent.parent
+    prefix = install_prefix(command)
     metadata=list((prefix/'conda-meta').glob('montreal-forced-aligner-*.json'))
     try:
-        if len(metadata)!=1 or json.loads(metadata[0].read_text(encoding='utf-8')).get('version')!='3.3.7':
-            raise UnsupportedRuntime('Reusable MFA supports version 3.3.7 only')
-        python=prefix/'python.exe'
+        versions = {'3.3.7', '3.4.2'} if command[1:] == ['-m', 'montreal_forced_aligner'] else {'3.3.7'}
+        if len(metadata)!=1 or json.loads(metadata[0].read_text(encoding='utf-8')).get('version') not in versions:
+            raise UnsupportedRuntime('Unsupported MFA package version')
+        python = prefix / ('bin/python' if len(command) == 5 else 'python.exe')
         if not python.is_file():raise UnsupportedRuntime('MFA Python is unavailable')
     except (OSError,ValueError,TypeError,AttributeError) as exc:
         raise UnsupportedRuntime('MFA runtime could not be verified') from exc
@@ -36,11 +49,11 @@ def runtime(command):
 
 
 class Client:
-    def __init__(self,python,env,*,worker_script=None,idle_sec=120):
+    def __init__(self,python,env,*,worker_script=None,idle_sec=120,launcher=()):
         script=Path(worker_script) if worker_script else Path(__file__).with_name('mfa_worker.py')
-        self.process=subprocess.Popen([str(python),'-B','-u',str(script),str(idle_sec)],
+        self.process=subprocess.Popen([*launcher,str(python),'-B','-u',str(script),str(idle_sec)],
             stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,
-            text=True,encoding='utf-8',bufsize=1,env=env,
+            text=True,encoding='utf-8',bufsize=1,env=env,start_new_session=os.name=='posix',
             creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
         self.responses=queue.Queue()
         self.calls=0
@@ -96,7 +109,11 @@ class Client:
                 subprocess.run(['taskkill','/PID',str(process.pid),'/T','/F'],
                     stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=10,check=False,
                     creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
-            else:process.kill()
+                if process.poll() is None:
+                    process.kill()
+            else:
+                try:os.killpg(process.pid,signal.SIGKILL)
+                except ProcessLookupError:pass
             process.wait(timeout=5)
         if process.stdin and not process.stdin.closed:process.stdin.close()
         if self.reader is not threading.current_thread():self.reader.join(timeout=2)
@@ -111,12 +128,18 @@ def run(args,*,stdout,timeout,env=None,idle_sec=120,profile=False,reuse_graphs=F
     """Execute under caller's lock; on actual failure do not silently retry CLI."""
     if type(idle_sec) is not int or not 30 <= idle_sec <= 600:
         raise ValueError('MFA idle retention must be an integer from 30 to 600 seconds')
-    python,version=runtime(args[:1])
+    try:
+        operation = args.index('align_one')
+    except ValueError as exc:
+        raise UnsupportedRuntime('Expected an align_one request') from exc
+    command = args[:operation]
+    python,version=runtime(command)
+    launcher = command[:-1] if len(command) == 5 else []
     effective=os.environ.copy() if env is None else env
     script=Path(__file__).with_name('mfa_worker.py')
     cache_script=Path(__file__).with_name('fst_resource_cache.py')
     cache_version=hashlib.sha256(cache_script.read_bytes()).hexdigest() if cache_script.is_file() else None
-    identity=json.dumps([str(python),version,effective,hashlib.sha256(script.read_bytes()).hexdigest(),cache_version,idle_sec],sort_keys=True)
+    identity=json.dumps([str(python),launcher,version,effective,hashlib.sha256(script.read_bytes()).hexdigest(),cache_version,idle_sec],sort_keys=True)
     key=hashlib.sha256(identity.encode()).hexdigest()
     with _guard:
         client=_clients.get(key)
@@ -125,8 +148,10 @@ def run(args,*,stdout,timeout,env=None,idle_sec=120,profile=False,reuse_graphs=F
             # Keep at most one owned interpreter per analysis process.
             for other in _clients.values():other.close()
             _clients.clear()
-            client=Client(python,effective,idle_sec=idle_sec);_clients[key]=client
-    return client.run(args,stdout.name,timeout,profile=profile,reuse_graphs=reuse_graphs)
+            client=Client(python,effective,idle_sec=idle_sec,**({'launcher':launcher} if launcher else {}));_clients[key]=client
+    result = client.run([command[-1], *args[operation:]],stdout.name,timeout,profile=profile,reuse_graphs=reuse_graphs)
+    result.args = args
+    return result
 
 
 def close_all():

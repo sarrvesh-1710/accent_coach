@@ -13,6 +13,7 @@ import math
 import os
 import re
 import shutil
+import signal
 import subprocess
 import tempfile
 import time
@@ -67,6 +68,17 @@ def load_settings(settings):
                 else:
                     result[key] = value
         result["_settings_dir"] = str(path.parent)
+        configured_cache = result.get("mfa", {}).get("dictionary_cache_directory")
+        if configured_cache:
+            cache = Path(configured_cache).expanduser()
+            result["mfa"]["dictionary_cache_directory"] = str((path.parent / cache).resolve())
+        cache_directory = os.environ.get('ACCENT_COACH_MFA_CACHE_DIR')
+        if cache_directory:
+            cache = Path(cache_directory)
+            if not cache.is_absolute():
+                raise ValueError('ACCENT_COACH_MFA_CACHE_DIR must be an absolute path')
+            result['mfa']['dictionary_cache_directory'] = str(cache)
+            result.setdefault('mfa_execution', {}).update(reuse_process=True, idle_sec=600)
         return result
     return dict(settings)
 
@@ -254,7 +266,7 @@ def attach_words(segments, tiers, duration):
 
 def run_mfa(args, *, stdout, stderr, timeout, check=False, creationflags=0, env=None):
     """Kill the owned process tree on timeout, before releasing the MFA lock."""
-    process = subprocess.Popen(args, stdout=stdout, stderr=stderr, creationflags=creationflags,
+    process = subprocess.Popen(args, start_new_session=os.name=='posix', stdout=stdout, stderr=stderr, creationflags=creationflags,
                                **({'env':env} if env is not None else {}))
     try:
         code = process.wait(timeout=timeout)
@@ -265,7 +277,8 @@ def run_mfa(args, *, stdout, stderr, timeout, check=False, creationflags=0, env=
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                            creationflags=subprocess.CREATE_NO_WINDOW, timeout=10, check=False)
         else:
-            process.kill()
+            try:os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:pass
         process.wait(timeout=5)
         raise
 

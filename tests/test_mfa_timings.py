@@ -14,6 +14,30 @@ mfa = importlib.import_module("phoneme_scoring.align_audio")
 
 
 class MFATimingTests(unittest.TestCase):
+    def test_relative_dictionary_cache_resolves_from_settings_directory(self):
+        import os
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'settings.json'
+            path.write_text(json.dumps({'mfa': {'dictionary_cache_directory': '../cache'}}))
+            with patch.dict(os.environ, {'ACCENT_COACH_MFA_CACHE_DIR': ''}):
+                settings = mfa.load_settings(path)
+            self.assertEqual(settings['mfa']['dictionary_cache_directory'],
+                             str((path.parent / '../cache').resolve()))
+
+    def test_demo_cache_configuration_reaches_loaded_worker_settings(self):
+        import os
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'settings.json'
+            path.write_text(json.dumps({'mfa': {}, 'mfa_execution': {'diagnostics': True}}))
+            with patch.dict(os.environ, {'ACCENT_COACH_MFA_CACHE_DIR': directory}):
+                settings = mfa.load_settings(path)
+                self.assertEqual(settings['mfa']['dictionary_cache_directory'], directory)
+                self.assertTrue(settings['mfa_execution']['reuse_process'])
+                self.assertTrue(settings['mfa_execution']['diagnostics'])
+            with patch.dict(os.environ, {'ACCENT_COACH_MFA_CACHE_DIR': 'relative-cache'}):
+                with self.assertRaises(ValueError):
+                    mfa.load_settings(path)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)

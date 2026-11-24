@@ -29,12 +29,9 @@ def plan(cfg):
     if not isinstance(location, str) or not Path(location).is_absolute():
         raise ValueError('Cache directory must be an absolute server-controlled path')
     command = cfg.get('command', [cfg.get('executable', '')])
-    if len(command) != 1 or Path(command[0]).name.lower() != 'mfa.exe':
-        raise ValueError('Dictionary cache experiment requires direct Windows MFA')
-    prefix = Path(command[0]).resolve().parent.parent
-    metadata = list((prefix / 'conda-meta').glob('montreal-forced-aligner-*.json'))
-    if len(metadata) != 1 or json.loads(metadata[0].read_text(encoding='utf-8')).get('version') != '3.3.7':
-        raise ValueError('Dictionary cache experiment supports installed MFA 3.3.7 only')
+    from .persistent_mfa import install_prefix, runtime as verify_runtime
+    verify_runtime(command)
+    prefix = install_prefix(command)
     environment = {**os.environ, **cfg.get('environment', {})}
     mfa_root = Path(environment.get('MFA_ROOT_DIR', '~/Documents/MFA')).expanduser().resolve()
 

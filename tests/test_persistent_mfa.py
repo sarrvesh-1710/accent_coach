@@ -95,6 +95,23 @@ class PersistentMFATests(unittest.TestCase):
             with self.assertRaises(reuse.UnsupportedRuntime):reuse.runtime(command)
         with self.assertRaises(reuse.UnsupportedRuntime):reuse.runtime(['conda','run','mfa'])
 
+    def test_micromamba_worker_receives_only_alignment_arguments(self):
+        prefix = self.root / 'linux-env'
+        (prefix / 'bin').mkdir(parents=True)
+        (prefix / 'bin/python').touch()
+        (prefix / 'conda-meta').mkdir()
+        (prefix / 'conda-meta/montreal-forced-aligner-test.json').write_text('{"version":"3.3.7"}')
+        command = ['micromamba', 'run', '-p', str(prefix), 'mfa']
+        args = [*command, 'align_one', 'clip.wav']
+        with patch.object(reuse, 'Client') as factory:
+            client = factory.return_value
+            client.run.return_value = subprocess.CompletedProcess([], 0)
+            result = reuse.run(args, stdout=self.log, timeout=10)
+            self.assertEqual(factory.call_args.args[0], prefix / 'bin/python')
+            self.assertEqual(factory.call_args.kwargs['launcher'], command[:-1])
+            self.assertEqual(client.run.call_args.args[0], ['mfa', 'align_one', 'clip.wav'])
+            self.assertEqual(result.args, args)
+
     def test_idle_retention_rejects_invalid_values_before_launch(self):
         with patch.object(reuse,'runtime') as runtime,patch.object(reuse,'Client') as client:
             for value in [None,True,0,29,601,120.0,'600']:

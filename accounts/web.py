@@ -200,7 +200,7 @@ def private_site(data_root=None, analyzer=None, prompts=None, speech=None, gener
             token = secrets.token_urlsafe(32)
         action, title = ('/signup', 'Create your account') if signup else ('/login', 'Sign in')
         name = '<label>Display name<input name="display_name" maxlength="60" autocomplete="name" required></label>' if signup else ''
-        body = f'''<section class="account-card"><p class="eyebrow">Accent Coach</p><h1>{title}</h1>
+        body = f'''<section class="account-card auth-card"><p class="eyebrow">Accent Coach</p><h1>{title}</h1>
         <p>Your profile, recordings and results are saved on this computer under your account.</p>
         <p class="form-error" role="alert">{html.escape(error)}</p>
         <form action="{action}" method="post" class="account-form">

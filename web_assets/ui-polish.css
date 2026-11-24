@@ -93,3 +93,103 @@ body,button,input,select,textarea,.document h1,.document h2,.document h3,.docume
 .coach-explanation .coach-tip {border-top:1px solid #dbe5e1;padding-top:10px;}
 .coach-controls button:focus-visible,.coach-controls input:focus-visible,.coach-explanation a:focus-visible {outline:3px solid #126e5a;outline-offset:3px;}
 @media(max-width:480px){.coach-controls button,.coach-explanation .button{max-width:100%;white-space:normal;}.coach-explanation{padding:14px;}.result-word-comparison{display:block;}.result-word-comparison dd{margin:4px 0 14px;overflow-wrap:anywhere;}}
+
+/* Shared interface refresh. Assets and typography remain local. */
+:root {
+  --ink: #172b3a;
+  --muted: #596b79;
+  --paper: #f4f7f9;
+  --line: #dce5eb;
+  --accent: #087d78;
+  --ui-ink: var(--ink);
+  --ui-muted: var(--muted);
+  --ui-border: var(--line);
+  --ui-green: #126a67;
+  --ui-soft: #edf7f5;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Inter", "Segoe UI", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.site-shell { width: min(1240px, calc(100% - 64px)); }
+.site-header { gap: 24px; padding: 22px 0; margin-bottom: 24px; border-color: var(--line); }
+.site-brand { font-size: 22px; letter-spacing: -.8px; gap: 10px; }
+.site-brand img { width: 34px; height: 34px; }
+.desktop-nav { gap: 6px; }
+.desktop-nav a {
+  padding: 10px 14px;
+  border-radius: 9px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+}
+.desktop-nav a:hover { background: #e9eff3; color: var(--ink); }
+.desktop-nav a[aria-current=page] { background: #e0efec; color: #115f5b; border-bottom: 0; }
+.account-menu > summary { border-color: var(--line); background: white; border-radius: 9px; }
+.account-menu-panel { border-color: var(--line); border-radius: 12px; box-shadow: 0 16px 48px #17354c15; }
+.document h1 { letter-spacing: -1.4px; color: var(--ink); }
+.document .eyebrow { color: #426e76; font-size: 11px; letter-spacing: .12em; }
+.account-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 4px 20px #253d5005;
+}
+.account-card h2 { color: var(--ink); letter-spacing: -.5px; }
+.account-card p { color: var(--muted); }
+button, .account-card a.button {
+  border-radius: 9px !important;
+  font-weight: 600;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+.account-card button.primary, .account-card .record-button, .account-card a.button.primary {
+  background: #126a67;
+  border-color: #126a67;
+  color: white;
+}
+.account-card button.primary:not(:disabled):hover,
+.account-card .record-button:not(:disabled):hover {
+  background: #0d5653;
+  border-color: #0d5653;
+}
+input:not([type=checkbox]):not([type=hidden]):not([type=file]), select, textarea {
+  border: 1px solid #cbd7df;
+  border-radius: 9px !important;
+  min-height: 46px;
+  background: #fff;
+  color: var(--ink);
+}
+input::placeholder, textarea::placeholder { color: #6c7d88; }
+input:focus-visible, select:focus-visible, textarea:focus-visible,
+button:focus-visible, a:focus-visible, summary:focus-visible {
+  outline: 3px solid #087d78 !important;
+  outline-offset: 3px;
+}
+.auth-card { max-width: 480px; margin: 40px 0; padding: 36px; }
+.auth-card h1 { font-size: clamp(30px, 5vw, 40px); }
+.auth-card .account-form { gap: 18px; }
+.auth-card label { font-size: 14px; font-weight: 600; }
+.auth-card .primary { width: 100%; margin: 0; }
+.auth-card .form-error:empty { display: none; }
+.site-footer { color: var(--muted); border-color: var(--line); padding: 28px 0; margin-top: 48px; font-size: 13px; }
+
+@media (max-width: 960px) {
+  .desktop-nav { gap: 0; }
+  .desktop-nav a { padding: 10px; }
+}
+@media (max-width: 760px) {
+  .site-shell { width: calc(100% - 32px); }
+  .site-header { gap: 12px; padding: 16px 0; margin-bottom: 20px; }
+  .desktop-nav { display: none; }
+  .mobile-nav { display: block; margin-left: auto; }
+  .mobile-links { top: 70px; border-color: var(--line); border-radius: 12px; }
+  .mobile-links a[aria-current=page] { border-bottom: 0; font-weight: 700; color: var(--accent); }
+  .auth-card { padding: 24px; margin: 24px 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  button, .account-card a.button { transition: none; }
+}

@@ -252,3 +252,66 @@ button:focus-visible, a:focus-visible, summary:focus-visible {
   .practice-limits span + span { padding-left: 12px; }
   .record-actions .record-button { width: 100%; justify-content: center; }
 }
+
+/* Profile settings and saved recordings share the practice workspace rhythm. */
+.profile-intro { max-width: 720px; padding: 12px 0 28px; }
+.profile-intro h1 { font-size: clamp(34px, 4vw, 46px); margin-bottom: 12px; letter-spacing: -1.4px; }
+.profile-intro > p:last-child { color: var(--muted); font-size: 17px; }
+.profile-layout { display: grid; grid-template-columns: minmax(0, 1fr) 310px; gap: 24px; align-items: start; }
+.profile-layout .profile-card { max-width: none; padding: 0; overflow: hidden; }
+.profile-layout .profile-header {
+  margin: 0;
+  padding: 28px 32px;
+  background: #edf5f6;
+  border-bottom: 1px solid #dce7eb;
+}
+.profile-layout .profile-header h2 { font-size: 28px; margin: 0 0 6px; letter-spacing: -.8px; }
+.profile-layout .profile-header p { font-size: 14px; color: #48616e; }
+.profile-layout .profile-form { padding: 28px 32px; }
+.profile-form .profile-group { gap: 16px; padding-bottom: 24px; margin-bottom: 24px; border-bottom: 1px solid var(--line); }
+.profile-form .profile-group:last-of-type { border-bottom: 0; padding-bottom: 0; }
+.profile-form .profile-group > legend { color: var(--ink); font-size: 18px; font-weight: 650; margin-bottom: 16px; }
+.profile-form .profile-help { font-size: 13px; line-height: 1.6; color: var(--muted); max-width: 64ch; }
+.profile-form #display-name { width: 100%; max-width: 440px; }
+.profile-form #learner-profile { width: 100%; max-width: 440px; background-color: #f8fafc; }
+.profile-form .profile-accent { padding: 14px 18px; border: 1px solid var(--line); border-radius: 10px; background: #f8fafc; margin: 0; }
+.profile-form .profile-accent h3 { font-size: 12px; font-weight: 500; color: var(--muted); margin: 0 0 4px; }
+.profile-form .profile-accent p { font-size: 15px; color: var(--ink); font-weight: 600; margin: 0; }
+.profile-layout .profile-goals { gap: 12px; }
+.profile-layout .profile-goal { padding: 18px 14px; background: #fff; border-radius: 11px; border-color: #d2dde5; }
+.profile-layout .profile-goal strong { font-size: 20px; letter-spacing: -.4px; color: var(--ink); }
+.profile-layout .profile-goal span span { font-size: 13px; color: var(--muted); }
+.profile-layout .profile-goal:hover { background: #f5f9fa; border-color: #8faeb5; }
+.profile-layout .profile-goal.is-selected,
+.profile-layout .profile-goal:has(input:checked) { background: #edf8f5 !important; border-color: #21827a !important; box-shadow: inset 0 0 0 1px #21827a; }
+.profile-layout .profile-actions { padding-top: 20px; margin-top: 24px; border-top: 1px solid var(--line); gap: 10px; }
+.profile-form .profile-actions[hidden] { display: none !important; }
+.profile-form #profile-status { font-size: 13px; }
+.profile-plan .plan-card { padding: 24px; background: #eef3f6; box-shadow: none; }
+#profile-progress { display: grid; gap: 16px; }
+.sound-check-card { background: #f8fafc; border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+.sound-check-card .sound-observation { color: #20635f; }
+.history-filters { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 16px; padding: 20px; background: #fff; border: 1px solid var(--line); border-radius: 12px; margin: 28px 0 20px; }
+.history-filters label { color: #38505f; font-size: 13px; font-weight: 600; display: grid; gap: 8px; }
+.history-filters input, .history-filters select { width: 100%; margin: 0; background-color: #f8fafc; }
+.history-date-group { border-color: var(--line); border-radius: 14px; margin: 24px 0; }
+.history-date-group .history-date { background: #edf2f6; color: #48616e; padding: 14px 22px; font-size: 13px; }
+.history-date-group .history-row { padding: 22px; border-top-color: #e6edf2; }
+.history-row h3 { color: var(--ink); font-size: 18px; line-height: 1.4; margin: 0 0 6px; letter-spacing: -.3px; }
+.history-row p { color: var(--muted); font-size: 14px; }
+.history-row button { border-color: #cad8e0; border-radius: 9px !important; color: #215f5c; background: #fff; min-height: 44px; font-size: 14px; }
+.history-row button:not(:disabled):hover { background: #eef7f5; border-color: #86ada5; }
+.history-status-badge { border-radius: 6px; font-size: 12px; font-weight: 600; padding: 4px 9px; }
+
+@media (max-width: 900px) {
+  .profile-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+}
+@media (max-width: 600px) {
+  .profile-layout .profile-header { padding: 24px 20px; }
+  .profile-layout .profile-form { padding: 24px 20px; }
+  .profile-layout .profile-goals { grid-template-columns: minmax(0, 1fr); }
+  .profile-layout .profile-goal { padding: 16px; }
+  .profile-form .profile-actions { flex-wrap: wrap; }
+  .history-filters { grid-template-columns: minmax(0, 1fr); padding: 16px; }
+  .history-date-group .history-row { padding: 18px; }
+}

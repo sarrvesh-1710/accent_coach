@@ -315,3 +315,75 @@ button:focus-visible, a:focus-visible, summary:focus-visible {
   .history-filters { grid-template-columns: minmax(0, 1fr); padding: 16px; }
   .history-date-group .history-row { padding: 18px; }
 }
+
+/* Native file selection keeps filenames and keyboard access in the browser. */
+.recording-workspace .upload-option {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+  margin: 20px 0 0;
+}
+.recording-workspace .upload-option > summary {
+  padding: 8px 0;
+  min-height: 44px;
+  color: #355566;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.wav-upload {
+  margin-top: 12px;
+  padding: 20px;
+  border: 1px dashed #a4bbc5;
+  border-radius: 12px;
+  background: #f7fafb;
+}
+.recording-workspace .wav-upload label {
+  display: block;
+  margin: 0 0 6px;
+  font-size: 15px;
+  color: var(--ink);
+  font-weight: 600;
+}
+.wav-upload #wav-upload-help {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.recording-workspace .wav-upload input[type=file] {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #cfdee4;
+  border-radius: 9px !important;
+  background: white;
+  color: #42606f;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 44px;
+  overflow: hidden;
+}
+.wav-upload input[type=file]::file-selector-button {
+  height: 44px;
+  padding: 0 18px;
+  margin: 0 14px 0 0;
+  border: 0;
+  border-right: 1px solid #cfdee4;
+  background: #e6f2ef;
+  color: #175c57;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.wav-upload input[type=file]:not(:disabled)::file-selector-button:hover { background: #d8ebe5; }
+.wav-upload:focus-within { border-color: #126a67; }
+.wav-upload input[type=file]:disabled { opacity: .55; cursor: default; }
+.wav-upload input[type=file]:disabled::file-selector-button { cursor: default; }
+
+@media (max-width: 540px) {
+  .wav-upload { padding: 16px; }
+  .wav-upload input[type=file]::file-selector-button { padding: 0 12px; margin-right: 10px; }
+}
